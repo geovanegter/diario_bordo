@@ -1,4 +1,4 @@
-import streamlit as st
+doimport streamlit as st
 import pandas as pd
 from datetime import datetime
 
@@ -99,7 +99,7 @@ if st.session_state.logado:
         vendas_rep = vendas[vendas["representante"] == representante]
         metas_rep = metas[metas["representante"] == representante]
 
-        total_vendido = vendas_rep["valor"].sum()
+        total_vendido = vendas_rep["valor_vendido"].sum()
         meta_total = metas_rep["meta"].sum()
         progresso = total_vendido / meta_total if meta_total > 0 else 0
 
@@ -175,4 +175,5 @@ if st.session_state.logado:
         st.session_state.logado = False
         st.session_state.pagina_atual = "Dashboard"
         st.success("✅ Logout realizado! Atualize a página para logar novamente.")
+
 
