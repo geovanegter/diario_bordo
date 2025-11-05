@@ -10,16 +10,44 @@ st.set_page_config(page_title="📘 Diário de Bordo Comercial", layout="wide")
 
 @st.cache_data
 def carregar_planilhas():
-    return {
-        "usuarios": pd.read_excel("dados/usuarios.xlsx"),
-        "vendas": pd.read_excel("dados/vendas.xlsx"),
-        "colecoes": pd.read_excel("dados/colecoes.xlsx"),
-        "metas": pd.read_excel("dados/metas_colecao.xlsx"),
-        "planos": pd.read_excel("dados/planos_acoes.xlsx"),
-    }
+    planilhas = {}
+    try:
+        planilhas["usuarios"] = pd.read_excel("dados/usuarios.xlsx")
+    except:
+        st.error("Planilha 'usuarios.xlsx' não encontrada!")
+        planilhas["usuarios"] = pd.DataFrame()
+
+    try:
+        planilhas["vendas"] = pd.read_excel("dados/vendas.xlsx")
+    except:
+        st.warning("Planilha 'vendas.xlsx' não encontrada, será criada ao registrar vendas.")
+        planilhas["vendas"] = pd.DataFrame(columns=["data","representante","cliente","colecao","valor"])
+
+    try:
+        planilhas["colecoes"] = pd.read_excel("dados/colecoes.xlsx")
+    except:
+        st.warning("Planilha 'colecoes.xlsx' não encontrada!")
+        planilhas["colecoes"] = pd.DataFrame(columns=["colecao"])
+
+    try:
+        planilhas["metas"] = pd.read_excel("dados/metas_colecao.xlsx")
+    except:
+        st.warning("Planilha 'metas_colecao.xlsx' não encontrada!")
+        planilhas["metas"] = pd.DataFrame(columns=["representante","colecao","meta"])
+
+    try:
+        planilhas["planos"] = pd.read_excel("dados/planos_acoes.xlsx")
+    except:
+        st.warning("Planilha 'planos_acoes.xlsx' não encontrada!")
+        planilhas["planos"] = pd.DataFrame(columns=["responsavel","acao","status"])
+
+    return planilhas
 
 def autenticar(email, senha):
     usuarios = dfs["usuarios"]
+
+    if usuarios.empty:
+        return None
 
     usuarios["email"] = usuarios["email"].astype(str)
     usuarios["senha"] = usuarios["senha"].astype(str)
@@ -32,6 +60,13 @@ def autenticar(email, senha):
     if len(user) == 1:
         return user.iloc[0].to_dict()
     return None
+
+# Função utilitária para evitar KeyError
+def coluna_valor_existe(df, coluna):
+    if coluna in df.columns:
+        return df[coluna]
+    else:
+        return pd.Series([0]*len(df))
 
 # -------------------------------
 # Carrega planilhas
@@ -63,7 +98,7 @@ if not st.session_state.logado:
             if user is not None:
                 st.session_state.logado = True
                 st.session_state.user = user
-                st.success("✅ Login realizado! Continue abaixo.")
+                st.success("✅ Login realizado! Use os botões ao lado para navegar.")
             else:
                 st.error("❌ Usuário ou senha inválidos!")
 
@@ -78,15 +113,16 @@ if st.session_state.logado:
     st.sidebar.title(f"👋 Olá, {nome_usuario}")
     st.sidebar.write(f"Representante: **{representante}**")
 
-    # Navegação
-    pagina = st.sidebar.button(
-        "Navegar",
-        ["Dashboard", "Registrar visita", "Plano de Ação", "Coleções / Metas"],
-        index=["Dashboard", "Registrar visita", "Plano de Ação", "Coleções / Metas"].index(
-            st.session_state.get("pagina_atual", "Dashboard")
-        )
-    )
-    st.session_state["pagina_atual"] = pagina
+    # -------------------------------
+    # Navegação por botões
+    # -------------------------------
+    st.sidebar.write("## Navegação")
+    paginas = ["Dashboard", "Registrar visita", "Plano de Ação", "Coleções / Metas"]
+    for p in paginas:
+        if st.sidebar.button(p):
+            st.session_state["pagina_atual"] = p
+
+    pagina = st.session_state.get("pagina_atual", "Dashboard")
 
     # -------------------------------
     # DASHBOARD
@@ -96,11 +132,11 @@ if st.session_state.logado:
         vendas = dfs["vendas"]
         metas = dfs["metas"]
 
-        vendas_rep = vendas[vendas["representante"] == representante]
-        metas_rep = metas[metas["representante"] == representante]
+        vendas_rep = vendas[vendas.get("representante", "") == representante]
+        metas_rep = metas[metas.get("representante", "") == representante]
 
-        total_vendido = vendas_rep["valor_vendido"].sum()
-        meta_total = metas_rep["meta_vendas"].sum()
+        total_vendido = coluna_valor_existe(vendas_rep, "valor").sum()
+        meta_total = coluna_valor_existe(metas_rep, "meta").sum()
         progresso = total_vendido / meta_total if meta_total > 0 else 0
 
         st.subheader("🎯 Progresso Geral da Meta")
@@ -140,7 +176,7 @@ if st.session_state.logado:
     elif pagina == "Plano de Ação":
         st.title("🚀 Plano de Ação Comercial")
         planos = dfs["planos"]
-        planos_rep = planos[planos["responsavel"] == representante]
+        planos_rep = planos[planos.get("responsavel", "") == representante]
         st.table(planos_rep)
 
     # -------------------------------
@@ -151,16 +187,19 @@ if st.session_state.logado:
         metas = dfs["metas"]
         vendas = dfs["vendas"]
 
-        metas_rep = metas[metas["representante"] == representante]
+        metas_rep = metas[metas.get("representante", "") == representante]
 
         for _, row in metas_rep.iterrows():
-            colecao = row["colecao"]
-            meta = row["meta"]
+            colecao = row.get("colecao", "Não definido")
+            meta = row.get("meta", 0)
 
-            vendido = vendas[
-                (vendas["representante"] == representante) &
-                (vendas["colecao"] == colecao)
-            ]["valor"].sum()
+            vendido = coluna_valor_existe(
+                vendas[
+                    (vendas.get("representante", "") == representante) &
+                    (vendas.get("colecao", "") == colecao)
+                ],
+                "valor"
+            ).sum()
 
             progresso = vendido / meta if meta > 0 else 0
             st.write(f"### {colecao}")
@@ -175,8 +214,3 @@ if st.session_state.logado:
         st.session_state.logado = False
         st.session_state.pagina_atual = "Dashboard"
         st.success("✅ Logout realizado! Atualize a página para logar novamente.")
-
-
-
-
-
