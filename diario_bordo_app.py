@@ -1,191 +1,169 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from pathlib import Path
 
-st.set_page_config(page_title="Diário de Bordo RC", layout="wide")
+# ------------------------
+# CONFIGURAÇÃO DA PÁGINA
+# ------------------------
+st.set_page_config(page_title="Diário de Bordo", layout="wide")
 
-# =======================
-# FUNÇÃO DE AUTENTICAÇÃO
-# =======================
-def authenticate(email, senha, usuarios_df):
-    # normaliza nomes
-    usuarios_df.columns = usuarios_df.columns.str.lower().str.strip()
+# -------------------------------------------------
+# FUNÇÃO DE LOGIN / LEITURA PLANILHAS DE USUÁRIOS
+# -------------------------------------------------
+@st.cache_data
+def load_users():
+    return pd.read_excel("dados/usuarios.xlsx")
 
-    # garante que email e senha sejam strings
-    usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip()
-    usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
-    usuarios_df["representante"] = usuarios_df["representante"].astype(str).str.strip()
-
-    # remove espaços invisíveis do input também
-    email = email.strip()
-    senha = senha.strip()
-
-    user = usuarios_df[
-        (usuarios_df["email"].str.lower() == email.lower())
-        & (usuarios_df["senha"] == senha)
-    ]
-
-    if not user.empty:
-        return user.iloc[0]["representante"]  # devolve o código SP01 / PR03 / ALL
-
-    return None
+def authenticate(email, senha):
+    users = load_users()
+    user = users[(users["email"] == email) & (users["senha"].astype(str) == str(senha))]
+    if len(user) == 1:
+        return True, user.iloc[0]["representante"]
+    return False, None
 
 
+# ---------------------------------------------------------------------------------
+# CARREGAR PLANILHAS DE METAS / COLEÇÕES / VENDAS
+# ---------------------------------------------------------------------------------
+@st.cache_data
+def load_metas():
+    return pd.read_excel("dados/metas.xlsx")
+
+@st.cache_data
+def load_colecoes():
+    return pd.read_excel("dados/colecoes.xlsx")
+
+@st.cache_data
+def load_vendas():
+    return pd.read_excel("dados/vendas.xlsx")
 
 
-# =======================
-# CARREGAR PLANILHAS
-# =======================
-def load_planilha(path, colunas_esperadas=None):
-    file_path = Path(path)
-
-    if not file_path.exists():
-        # Se o arquivo não existir, cria um DF vazio com colunas mínimas
-        return pd.DataFrame(columns=colunas_esperadas or [])
-
-    df = pd.read_excel(file_path)
-    df.columns = df.columns.str.lower().str.strip()
-
-    if colunas_esperadas:
-        for col in colunas_esperadas:
-            if col not in df.columns:
-                df[col] = None  # adiciona coluna faltante
-
-    return df
-
-
-# ==========================
-# CARREGAR USUÁRIOS
-# ==========================
-usuarios_df = load_planilha(
-    "dados/usuarios.xlsx",
-    colunas_esperadas=["email", "senha", "representante"]
-)
-
-# ==========================
+# ======================
 # TELA DE LOGIN
-# ==========================
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+# ======================
+if "login" not in st.session_state:
+    st.session_state.login = False
 
-if not st.session_state.logged_in:
-    st.title("🔐 Diário de Bordo — Login")
+if not st.session_state.login:
 
-    email = st.text_input("E-mail")
-    senha = st.text_input("Senha", type="password")
+    st.markdown(
+        """
+        <h1 style="text-align:center;">🔐 Diário de Bordo — Login</h1>
+        """,
+        unsafe_allow_html=True
+    )
 
-    if st.button("Entrar"):
-        if authenticate(email, senha, usuarios_df):
-            st.session_state.logged_in = True
-            st.session_state.usuario = email
+    with st.form("login"):
+        email = st.text_input("E-mail")
+        senha = st.text_input("Senha", type="password")
+        submit = st.form_submit_button("Entrar")
 
-            rep = usuarios_df[usuarios_df["email"] == email]["representante"].iloc[0]
+    if submit:
+        valid, rep = authenticate(email, senha)
+        if valid:
+            st.session_state.login = True
+            st.session_state.user_email = email
             st.session_state.representante = rep
-
             st.rerun()
         else:
             st.error("❌ E-mail ou senha incorretos.")
 
-    st.stop()  # Impede que carregue o resto da página antes de logar
+    st.stop()
 
-
-# ==========================
-# PUXA REPRESENTANTE LOGADO
-# ==========================
+# Se o usuário estiver logado ----------------------------------------------------
 rep = st.session_state.representante
+user_email = st.session_state.user_email
 
-st.sidebar.write(f"👤 Logado como: **{rep}**")
-if st.sidebar.button("Sair"):
-    st.session_state.logged_in = False
-    st.rerun()
-
-
-# ==========================
-# CARREGA VENDAS & PLANOS
-# ==========================
-vendas_df = load_planilha(
-    "dados/vendas.xlsx",
-    colunas_esperadas=[
-        "representante","cliente","cidade","colecao","marca","bairro","cep",
-        "qtd_pecas","valor_vendido","desconto","prazo"
-    ]
+# MENU LATERAL
+menu = st.sidebar.radio(
+    "Navegação",
+    ["Visão Geral", "Meus Objetivos", "Clientes", "Dossiê Cliente"]
 )
 
-planos_df = load_planilha(
-    "dados/planos_acoes.xlsx",
-    colunas_esperadas=[
-        "representante","cliente","cidade","acao_sugerida","status_acao","comentarios"
-    ]
-)
 
-# Filtra vendas por representante logado
-vendas_rep = vendas_df[vendas_df["representante"] == rep].copy()
+# 📊 CARREGA PLANILHAS
+df_metas = load_metas()
+df_colecoes = load_colecoes()
+df_vendas = load_vendas()
 
+# Define coleção vigente
+colecao = df_colecoes[df_colecoes["representante"] == rep]["colecao_vigente"].iloc[0]
 
-# ==========================
-# TELA PRINCIPAL — DASHBOARD
-# ==========================
-st.title("📊 Diário de Bordo — Representante Comercial")
+# Filtra metas do representante
+meta_rep = df_metas[(df_metas["representante"] == rep) & (df_metas["colecao"] == colecao)].iloc[0]
+meta_vendas = meta_rep["meta_vendas"]
+meta_clientes = meta_rep["meta_clientes"]
 
-# KPIs básicos
-col1, col2, col3 = st.columns(3)
-
-meta = st.sidebar.number_input("Meta da semana (R$)", value=100000.0)
+# Filtra vendas da coleção vigente
+vendas_rep = df_vendas[(df_vendas["representante"] == rep) & (df_vendas["colecao"] == colecao)]
 
 total_vendido = vendas_rep["valor_vendido"].sum()
-perc_meta = (total_vendido / meta * 100) if meta > 0 else 0
+clientes_atendidos = vendas_rep["cliente"].nunique()
 
-col1.metric("Total vendido (semana)", f"R$ {total_vendido:,.2f}")
-col2.metric("Meta da semana", f"R$ {meta:,.2f}")
-col3.metric("Atingimento", f"{perc_meta:.1f}%")
+pct_vendas = (total_vendido / meta_vendas) * 100
+pct_clientes = (clientes_atendidos / meta_clientes) * 100
 
-# ==========================
-# TOP CLIENTES NÃO ATENDIDOS
-# ==========================
-clientes_atendidos = set(vendas_rep["cliente"].unique())
+# ======================
+# TELA: VISÃO GERAL
+# ======================
+if menu == "Visão Geral":
 
-todos_clientes = vendas_df["cliente"].unique()
-nao_atendidos = [c for c in todos_clientes if c not in clientes_atendidos]
+    st.markdown(f"### 👋 Olá, **{rep}**")
+    st.markdown(f"📌 Coleção vigente: **{colecao}**")
 
-if nao_atendidos:
-    st.subheader("⚠️ Clientes não atendidos")
-    st.table(pd.DataFrame({"cliente": nao_atendidos[:5]}))
-else:
-    st.success("✅ Você atendeu todos os clientes!")
+    col1, col2 = st.columns(2)
 
-# ==========================
-# KANBAN (Ações)
-# ==========================
-st.subheader("🗂️ Planos de ação")
+    # -------- BLOCO META DE VENDAS --------
+    with col1:
+        st.subheader("💰 Meta de Vendas da Coleção")
 
-planos_rep = planos_df[planos_df["representante"] == rep].copy()
+        fig = px.pie(
+            values=[total_vendido, max(meta_vendas - total_vendido, 0)],
+            names=["Vendido", "Falta vender"],
+            hole=0.5
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-col_a, col_b, col_c = st.columns(3)
+        st.metric("Vendas realizadas", f"R$ {total_vendido:,.2f}")
+        st.metric("Meta da coleção", f"R$ {meta_vendas:,.2f}")
+        st.metric("Falta vender", f"R$ {max(meta_vendas - total_vendido, 0):,.2f}")
 
-col_a.write("🟡 **A Fazer**")
-col_b.write("🔵 **Em andamento**")
-col_c.write("🟢 **Concluído**")
+    # -------- BLOCO META DE CLIENTES --------
+    with col2:
+        st.subheader("👥 Meta de Clientes da Coleção")
 
-for _, row in planos_rep.iterrows():
-    card = f"""
-    **{row['cliente']}**  
-    📍 {row.get('cidade', '')}  
-    ✏️ {row.get('acao_sugerida', '')}
-    """
-    if row["status_acao"] == "A Fazer":
-        col_a.info(card)
-    elif row["status_acao"] == "Em Andamento":
-        col_b.warning(card)
-    else:
-        col_c.success(card)
+        fig = px.pie(
+            values=[clientes_atendidos, max(meta_clientes - clientes_atendidos, 0)],
+            names=["Clientes atendidos", "Faltam"],
+            hole=0.5
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
+        st.metric("Clientes atendidos", clientes_atendidos)
+        st.metric("Meta da coleção", meta_clientes)
+        st.metric("Faltam atender", max(meta_clientes - clientes_atendidos, 0))
 
 
+# ======================
+# TELA: MEUS OBJETIVOS
+# ======================
+elif menu == "Meus Objetivos":
+    st.header("🎯 Meus Objetivos")
+    st.info("Tela em construção — vamos definir objetivos por coleção, ranking e desafios semanais.")
 
+# ======================
+# TELA: CLIENTES
+# ======================
+elif menu == "Clientes":
+    st.header("📋 Minha carteira de clientes")
+    st.dataframe(vendas_rep)
 
-
-
-
-
+# ======================
+# TELA: DOSSIÊ DO CLIENTE
+# ======================
+elif menu == "Dossiê Cliente":
+    st.header("🧠 Dossiê do Cliente")
+    cliente = st.selectbox("Selecione um cliente", vendas_rep["cliente"].unique())
+    df_cli = vendas_rep[vendas_rep["cliente"] == cliente]
+    st.write(df_cli)
 
