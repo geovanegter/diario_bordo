@@ -85,12 +85,12 @@ if st.session_state.user is None:
     email_input = st.text_input("E-mail")
     senha_input = st.text_input("Senha", type="password")
 
-    if st.button("Entrar"):
-        user = authenticate(email_input, senha_input)
-        if user:
-            st.session_state.user = user
-            st.success(f"Bem-vindo(a), {user.get('nome') or user['email']}!")
-            st.experimental_rerun()
+if st.button("Entrar"):
+    user = authenticate(email_input, senha_input)
+    if user:
+        st.session_state.user = user
+        st.success(f"Bem-vindo(a), {user.get('nome') or user['email']}!")
+        st.rerun()
         else:
             st.error("E-mail ou senha incorretos. Verifique a planilha dados/usuarios.xlsx.")
 
@@ -243,3 +243,4 @@ elif view == "Clientes":
     view_clientes()
 elif view == "Dossiê Cliente":
     view_dossie()
+
