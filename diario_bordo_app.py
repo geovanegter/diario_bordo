@@ -9,19 +9,28 @@ st.set_page_config(page_title="Diário de Bordo RC", layout="wide")
 # FUNÇÃO DE AUTENTICAÇÃO
 # =======================
 def authenticate(email, senha, usuarios_df):
+    # normaliza nomes
     usuarios_df.columns = usuarios_df.columns.str.lower().str.strip()
 
-    # remove espaços invisíveis das células
-    usuarios_df = usuarios_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    # garante que email e senha sejam strings
+    usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip()
+    usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
+    usuarios_df["representante"] = usuarios_df["representante"].astype(str).str.strip()
 
-    st.sidebar.write("DEBUG:", usuarios_df)  # <- remove depois
+    # remove espaços invisíveis do input também
+    email = email.strip()
+    senha = senha.strip()
 
     user = usuarios_df[
-        (usuarios_df["email"].str.lower() == email.strip().lower()) &
-        (usuarios_df["senha"] == senha.strip())
+        (usuarios_df["email"].str.lower() == email.lower())
+        & (usuarios_df["senha"] == senha)
     ]
 
-    return not user.empty
+    if not user.empty:
+        return user.iloc[0]["representante"]  # devolve o código SP01 / PR03 / ALL
+
+    return None
+
 
 
 
@@ -170,6 +179,7 @@ for _, row in planos_rep.iterrows():
         col_b.warning(card)
     else:
         col_c.success(card)
+
 
 
 
