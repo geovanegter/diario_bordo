@@ -170,17 +170,45 @@ if 'rep_name' in st.session_state:
 
         # ensure index unique keys
         for idx, row in planos_rep.reset_index().iterrows():
-            card_html = f"**{row['cliente']}** — {row.get('acao_sugerida','')}"
 
-{row.get('cidade','')} • {row.get('qtd_pecas',0)} peças • R$ {row.get('valor_vendido',0):,.2f}"
-            st.markdown("""<div style='border:1px solid #ddd;padding:8px;border-radius:6px;margin-bottom:8px'>""", unsafe_allow_html=True)
+            card_html = f"""
+**{row['cliente']}** — {row.get('acao_sugerida', '')}  
+{row.get('cidade','')} • {row.get('qtd_pecas',0)} peças • R$ {row.get('valor_vendido',0):,.2f}
+"""
+
+            st.markdown(
+                "<div style='border:1px solid #ddd;padding:8px;border-radius:6px;margin-bottom:8px'>",
+                unsafe_allow_html=True
+            )
             st.markdown(card_html)
-            new_status = st.selectbox("Mover para", options=statuses, index=statuses.index(row['status_acao']) if row['status_acao'] in statuses else 0, key=f"status_{idx}")
-            planos_df.loc[(planos_df['cliente']==row['cliente']) & (planos_df['representante']==rep),'status_acao'] = new_status
-            comment_key = f"coment_{idx}"
-            comment = st.text_area("Comentário", value=row.get('comentarios','') if 'comentarios' in row else '', key=comment_key)
-            planos_df.loc[(planos_df['cliente']==row['cliente']) & (planos_df['representante']==rep),'comentarios'] = comment
+
+            # Dropdown de status
+            new_status = st.selectbox(
+                "Mover para",
+                options=statuses,
+                index=statuses.index(row['status_acao']) if row['status_acao'] in statuses else 0,
+                key=f"status_{idx}"
+            )
+            planos_df.loc[
+                (planos_df['cliente'] == row['cliente']) &
+                (planos_df['representante'] == rep),
+                'status_acao'
+            ] = new_status
+
+            # Campo de comentário
+            comment = st.text_area(
+                "Comentário",
+                value=row.get('comentarios', ''),
+                key=f"coment_{idx}"
+            )
+            planos_df.loc[
+                (planos_df['cliente'] == row['cliente']) &
+                (planos_df['representante'] == rep),
+                'comentarios'
+            ] = comment
+
             st.markdown("</div>", unsafe_allow_html=True)
+
 
         if st.button("Salvar alterações no Kanban"):
             save_planos(planos_df)
@@ -206,6 +234,7 @@ if 'rep_name' in st.session_state:
 
 else:
     st.info("Por favor, faça login com seu email e senha.")
+
 
 
 
