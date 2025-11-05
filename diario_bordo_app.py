@@ -7,7 +7,7 @@ from pathlib import Path
 # ============================================
 st.set_page_config(page_title="Diário de Bordo", layout="wide")
 
-EXCEL_FILE = "dados.xlsx"  # <-- ajuste aqui se estiver em outro caminho
+EXCEL_FILE = "vendas.xlsx"  # <-- ajuste aqui se estiver em outro caminho
 
 # ============================================
 # FUNÇÃO PARA CARREGAR PLANILHAS
@@ -140,4 +140,5 @@ if pagina == "Visão geral":
 # ============================================
 # MEUS OBJETIVOS
 # =========================
+
 
