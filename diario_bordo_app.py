@@ -91,8 +91,8 @@ if st.button("Entrar"):
         st.session_state.user = user
         st.success(f"Bem-vindo(a), {user.get('nome') or user['email']}!")
         st.rerun()
-        else:
-            st.error("E-mail ou senha incorretos. Verifique a planilha dados/usuarios.xlsx.")
+    else:
+        st.error("E-mail ou senha incorretos. Verifique a planilha dados/usuarios.xlsx.")
 
     # Mostrar debug opcional (remova em produção)
     with st.expander("DEBUG: Usuários carregados (apenas para teste)"):
@@ -243,4 +243,5 @@ elif view == "Clientes":
     view_clientes()
 elif view == "Dossiê Cliente":
     view_dossie()
+
 
