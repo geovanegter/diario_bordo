@@ -104,7 +104,7 @@ if 'rep_name' in st.session_state:
     # Top bar: saudação e resumo rápido
     st.header(f"Olá, {rep}")
     # Definir metas (no MVP, fixas — depois podem vir da planilha)
-    meta_r$ = st.sidebar.number_input("Meta da semana (R$)", value=100000.0)
+    meta_reais = st.sidebar.number_input("Meta da semana (R$)", value=100000.0)
     meta_clientes = st.sidebar.number_input("Meta de clientes (unidades)", value=50)
     semana_num = st.sidebar.number_input("Semana nº", value=5, min_value=1)
 
@@ -113,7 +113,7 @@ if 'rep_name' in st.session_state:
     total_pecas = df_rep['qtd_pecas'].sum() if not df_rep.empty else 0
     total_clientes = df_rep['cliente'].nunique() if not df_rep.empty else 0
 
-    pct_cota = (total_vendido / meta_r$) * 100 if meta_r$ > 0 else 0
+    pct_cota = (total_vendido / meta_reais) * 100 if meta_r$ > 0 else 0
     pct_dias = 0  # placeholder: se tivermos dados por dia podemos calcular
 
     col1, col2, col3, col4 = st.columns([3,2,2,2])
@@ -132,7 +132,7 @@ if 'rep_name' in st.session_state:
 
     # Objetivos da semana (barra de atingimento cliente)
     st.subheader("Objetivos da semana")
-    st.write(f"Meta: R$ {meta_r$:.0f} — Clientes: {int(meta_clientes)}")
+    st.write(f"Meta: R$ {meta_reais:.0f} — Clientes: {int(meta_clientes)}")
     st.progress(min(total_clientes / max(meta_clientes,1), 1.0))
 
     # Alerts: top 5 clientes não atendidos e top 5 cidades
@@ -206,3 +206,4 @@ if 'rep_name' in st.session_state:
 
 else:
     st.info("Por favor, faça login com seu email e senha.")
+
