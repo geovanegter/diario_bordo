@@ -74,16 +74,20 @@ if not st.session_state.logado:
 # TELA PRINCIPAL (pós login)
 # -------------------------------
 
-user = st.session_state.user
-representante = user.get("representante")
+# Garante que o usuário esteja logado e que user seja um dict
+user = st.session_state.get("user", None)
 
-st.sidebar.title(f"👋 Olá, {user['nome']}")
+if not user or not isinstance(user, dict):
+    st.error("❌ Usuário não autenticado. Faça login novamente.")
+    st.stop()
+
+# Pega o representante com segurança
+representante = user.get("representante", "Não definido")
+nome_usuario = user.get("nome", "Usuário")
+
+st.sidebar.title(f"👋 Olá, {nome_usuario}")
 st.sidebar.write(f"Representante: **{representante}**")
 
-pagina = st.sidebar.radio(
-    "Navegar",
-    ["Dashboard", "Registrar visita", "Plano de Ação", "Coleções / Metas"]
-)
 
 # -------------------------------
 # DASHBOARD
@@ -183,5 +187,6 @@ elif pagina == "Coleções / Metas":
 if st.sidebar.button("Logout"):
     st.session_state.user = None
     st.experimental_rerun()
+
 
 
