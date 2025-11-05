@@ -8,9 +8,9 @@ import plotly.express as px
 @st.cache_data
 def carregar_usuarios():
     try:
-        return pd.read_excel("usuarios.xlsx")
+        return pd.read_excel("dados/usuarios.xlsx")
     except:
-        st.error("⚠️ Arquivo usuarios.xlsx não encontrado no repositório.")
+        st.error("⚠️ Arquivo dados/usuarios.xlsx não encontrado no repositório.")
         return None
 
 # ---------------------------
@@ -19,10 +19,11 @@ def carregar_usuarios():
 @st.cache_data
 def carregar_vendas():
     try:
-        return pd.read_excel("vendas.xlsx")
+        return pd.read_excel("dados/vendas.xlsx")
     except:
-        st.error("⚠️ Arquivo vendas.xlsx não encontrado no repositório.")
+        st.error("⚠️ Arquivo dados/vendas.xlsx não encontrado no repositório.")
         return None
+
 
 # ---------------------------
 # LOGIN
@@ -144,6 +145,7 @@ st.write(f"Você está na **posição {int(minha_posicao)}** do ranking 🎯")
 
 fig_ranking = px.bar(ranking, x="representante", y="valor_vendido", title="Ranking de Vendas")
 st.plotly_chart(fig_ranking)
+
 
 
 
