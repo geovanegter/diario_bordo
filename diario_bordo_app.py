@@ -113,7 +113,7 @@ if 'rep_name' in st.session_state:
     total_pecas = df_rep['qtd_pecas'].sum() if not df_rep.empty else 0
     total_clientes = df_rep['cliente'].nunique() if not df_rep.empty else 0
 
-    pct_cota = (total_vendido / meta_reais) * 100 if meta_r$ > 0 else 0
+    pct_cota = (total_vendido / meta_reais) * 100 if meta_reais > 0 else 0
     pct_dias = 0  # placeholder: se tivermos dados por dia podemos calcular
 
     col1, col2, col3, col4 = st.columns([3,2,2,2])
@@ -206,4 +206,5 @@ if 'rep_name' in st.session_state:
 
 else:
     st.info("Por favor, faça login com seu email e senha.")
+
 
