@@ -10,11 +10,19 @@ st.set_page_config(page_title="Diário de Bordo RC", layout="wide")
 # =======================
 def authenticate(email, senha, usuarios_df):
     usuarios_df.columns = usuarios_df.columns.str.lower().str.strip()
+
+    # remove espaços invisíveis das células
+    usuarios_df = usuarios_df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+    st.sidebar.write("DEBUG:", usuarios_df)  # <- remove depois
+
     user = usuarios_df[
-        (usuarios_df["email"] == email) &
-        (usuarios_df["senha"] == senha)
+        (usuarios_df["email"].str.lower() == email.strip().lower()) &
+        (usuarios_df["senha"] == senha.strip())
     ]
+
     return not user.empty
+
 
 
 # =======================
@@ -162,6 +170,7 @@ for _, row in planos_rep.iterrows():
         col_b.warning(card)
     else:
         col_c.success(card)
+
 
 
 
