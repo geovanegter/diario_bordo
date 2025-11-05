@@ -7,7 +7,7 @@ from pathlib import Path
 # ============================================
 st.set_page_config(page_title="Diário de Bordo", layout="wide")
 
-EXCEL_FILE = "vendas.xlsx"  # <-- ajuste aqui se estiver em outro caminho
+EXCEL_FILE = "dados"  # <-- ajuste aqui se estiver em outro caminho
 
 # ============================================
 # FUNÇÃO PARA CARREGAR PLANILHAS
@@ -139,6 +139,33 @@ if pagina == "Visão geral":
 
 # ============================================
 # MEUS OBJETIVOS
-# =========================
+# ============================================
+elif pagina == "Meus Objetivos":
+    st.title("🎯 Meus Objetivos")
+    planos_rep = data["planos"][data["planos"]["representante"] == rep]
+    st.dataframe(planos_rep)
+
+
+# ============================================
+# CLIENTES
+# ============================================
+elif pagina == "Clientes":
+    st.title("📋 Lista de clientes")
+    clientes_rep = data["clientes"][data["clientes"]["representante"] == rep]
+    st.dataframe(clientes_rep)
+
+
+# ============================================
+# Dossiê Cliente
+# ============================================
+elif pagina == "Dossiê Cliente":
+    st.title("🗂️ Dossiê do Cliente")
+    clientes_rep = data["clientes"][data["clientes"]["representante"] == rep]
+
+    cliente_select = st.selectbox("Selecione um cliente:", clientes_rep["cliente"])
+    cliente_infos = clientes_rep[clientes_rep["cliente"] == cliente_select].iloc[0].to_dict()
+
+    st.write("📌 **Informações do cliente:**")
+    st.json(cliente_infos)
 
 
