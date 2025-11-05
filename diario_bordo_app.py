@@ -39,7 +39,7 @@ def load_vendas():
 
 
 # ======================
-# TELA DE LOGIN
+# TELA DE LOGIN CORRIGIDA
 # ======================
 if "login" not in st.session_state:
     st.session_state.login = False
@@ -53,12 +53,10 @@ if not st.session_state.login:
         unsafe_allow_html=True
     )
 
-    with st.form("login"):
-        email = st.text_input("E-mail")
-        senha = st.text_input("Senha", type="password")
-        submit = st.form_submit_button("Entrar")
+    email = st.text_input("E-mail")
+    senha = st.text_input("Senha", type="password")
 
-    if submit:
+    if st.button("Entrar"):
         valid, rep = authenticate(email, senha)
         if valid:
             st.session_state.login = True
@@ -69,6 +67,7 @@ if not st.session_state.login:
             st.error("❌ E-mail ou senha incorretos.")
 
     st.stop()
+
 
 # Se o usuário estiver logado ----------------------------------------------------
 rep = st.session_state.representante
@@ -166,4 +165,5 @@ elif menu == "Dossiê Cliente":
     cliente = st.selectbox("Selecione um cliente", vendas_rep["cliente"].unique())
     df_cli = vendas_rep[vendas_rep["cliente"] == cliente]
     st.write(df_cli)
+
 
