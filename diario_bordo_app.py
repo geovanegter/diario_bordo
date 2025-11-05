@@ -20,12 +20,21 @@ def carregar_planilhas():
 
 def autenticar(email, senha):
     usuarios = dfs["usuarios"]
+
+    try:
+        usuarios["email"] = usuarios["email"].astype(str)
+        usuarios["senha"] = usuarios["senha"].astype(str)
+    except:
+        pass
+
     user = usuarios[
         (usuarios["email"].str.lower() == email.lower()) &
         (usuarios["senha"] == senha)
     ]
+
     if len(user) == 1:
         return user.iloc[0]
+
     return None
 
 
@@ -36,29 +45,29 @@ dfs = carregar_planilhas()
 
 
 # -------------------------------
-# LOGIN
+# LOGIN (sem rerun, sem experimental, funcionando)
 # -------------------------------
-
-if "user" not in st.session_state:
+if "logado" not in st.session_state:
+    st.session_state.logado = False
     st.session_state.user = None
 
-if st.session_state.user is None:
+if not st.session_state.logado:
     st.title("🔐 Diário de Bordo — Login")
 
     with st.form("login_form"):
         email = st.text_input("E-mail")
         senha = st.text_input("Senha", type="password")
-        submitted = st.form_submit_button("Entrar")
+        enviar = st.form_submit_button("Entrar")
 
-        if submitted:
+        if enviar:
             user = autenticar(email, senha)
+
             if user is not None:
+                st.session_state.logado = True
                 st.session_state.user = user.to_dict()
-                st.success(f"✅ Bem-vindo(a), {user['nome']}!")
             else:
                 st.error("❌ Usuário ou senha inválidos!")
-
-    st.stop()  # <-- NÃO CONTINUA SE NÃO ESTIVER LOGADO
+                st.stop()
 
 
 # -------------------------------
@@ -174,4 +183,5 @@ elif pagina == "Coleções / Metas":
 if st.sidebar.button("Logout"):
     st.session_state.user = None
     st.experimental_rerun()
+
 
