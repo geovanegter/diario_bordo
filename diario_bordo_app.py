@@ -1,4 +1,4 @@
-doimport streamlit as st
+import streamlit as st
 import pandas as pd
 from datetime import datetime
 
@@ -175,5 +175,6 @@ if st.session_state.logado:
         st.session_state.logado = False
         st.session_state.pagina_atual = "Dashboard"
         st.success("✅ Logout realizado! Atualize a página para logar novamente.")
+
 
 
