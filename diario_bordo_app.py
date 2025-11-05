@@ -170,7 +170,7 @@ if 'rep_name' in st.session_state:
 
         # ensure index unique keys
         for idx, row in planos_rep.reset_index().iterrows():
-            card_html = f"**{row['cliente']}** — {row.get('acao_sugerida','')}
+            card_html = f"**{row['cliente']}** — {row.get('acao_sugerida','')}"
 
 {row.get('cidade','')} • {row.get('qtd_pecas',0)} peças • R$ {row.get('valor_vendido',0):,.2f}"
             st.markdown("""<div style='border:1px solid #ddd;padding:8px;border-radius:6px;margin-bottom:8px'>""", unsafe_allow_html=True)
@@ -206,5 +206,6 @@ if 'rep_name' in st.session_state:
 
 else:
     st.info("Por favor, faça login com seu email e senha.")
+
 
 
