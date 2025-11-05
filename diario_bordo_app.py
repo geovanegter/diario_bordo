@@ -1,130 +1,206 @@
+# ------------------------------------------------------------
+# Diário de Bordo MVP - App Streamlit
+# ------------------------------------------------------------
+# Requisitos:
+# - /dados/usuarios.xlsx   (colunas: representante, email, senha)
+# - /dados/vendas.xlsx     (colunas: representante, cliente, cidade, colecao,
+#                           marca, bairro, cep, qtd_pecas, valor_vendido, desconto, prazo)
+# - O sistema cria /dados/planos_acoes.xlsx automaticamente no 1º acesso
+# ------------------------------------------------------------
+
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+from pathlib import Path
 
-# =========================
-# CONFIGURAÇÃO DA PÁGINA
-# =========================
-st.set_page_config(
-    page_title="Diário de Bordo Comercial",
-    layout="wide"
-)
+# ================= CONFIGURAÇÃO =================
+st.set_page_config(page_title="Diário de Bordo", layout="wide")
 
-# =========================
-# FUNÇÃO: LOGIN
-# =========================
-@st.cache_data
+DATA_DIR = Path("dados")
+DATA_DIR.mkdir(exist_ok=True)
+
+USERS_FILE = DATA_DIR / "usuarios.xlsx"
+VENDAS_FILE = DATA_DIR / "vendas.xlsx"
+PLANOS_FILE = DATA_DIR / "planos_acoes.xlsx"
+
+
+# ================ ARQUIVOS (GARANTE EXISTIR) =================
+def ensure_files_exist():
+    if not USERS_FILE.exists():
+        users = pd.DataFrame([
+            {"representante": "SP01", "email": "sp01@rc.com", "senha": "1234"},
+            {"representante": "PR03", "email": "pr03@rc.com", "senha": "5678"},
+        ])
+        users.to_excel(USERS_FILE, index=False)
+
+    if not PLANOS_FILE.exists():
+        planos = pd.DataFrame(columns=[
+            "representante", "cliente", "cidade", "colecao", "marca", "bairro", "cep",
+            "qtd_pecas", "valor_vendido", "desconto", "prazo",
+            "acao_sugerida", "status_acao", "comentarios"
+        ])
+        planos.to_excel(PLANOS_FILE, index=False)
+
+
+# ================ LOAD DATA =================
 def load_users():
-    try:
-        return pd.read_excel("usuarios.xlsx")
-    except:
-        st.error("❌ Arquivo usuarios.xlsx não encontrado no diretório do app.")
-        return None
+    df = pd.read_excel(USERS_FILE, engine="openpyxl")
+    df.columns = [c.lower().strip() for c in df.columns]
+    return df
 
-@st.cache_data
-def load_sales():
-    try:
-        return pd.read_excel("vendas.xlsx")
-    except:
-        st.error("❌ Arquivo vendas.xlsx não encontrado.")
-        return None
+def load_vendas():
+    df = pd.read_excel(VENDAS_FILE, engine="openpyxl")
+    df.columns = [c.lower().strip() for c in df.columns]
+    return df
 
-def login(email, senha, df_users):
-    user = df_users[(df_users["email"] == email) & (df_users["senha"] == senha)]
-    if len(user) == 1:
-        return user.iloc[0]  # retorna a linha com nome e representante
+def load_planos():
+    try:
+        df = pd.read_excel(PLANOS_FILE, engine="openpyxl")
+    except:
+        df = pd.DataFrame()
+    df.columns = [c.lower().strip() for c in df.columns]
+    return df
+
+
+def save_planos(df):
+    df.to_excel(PLANOS_FILE, index=False)
+
+
+# ================ AUTENTICAÇÃO =================
+def authenticate(email, senha, users_df):
+    mask = (users_df["email"] == email) & (users_df["senha"] == senha)
+    if mask.any():
+        return users_df.loc[mask, "representante"].iloc[0]
     return None
 
-# =========================
-# TELA DE LOGIN
-# =========================
-if "usuario" not in st.session_state:
-    st.session_state.usuario = None
 
-if st.session_state.usuario is None:
+# ============================================================
+# APP
+# ============================================================
+ensure_files_exist()
 
-    st.title("🔐 Login — Diário de Bordo Comercial")
+st.title("📋 Diário de Bordo — MVP")
+st.caption("Primeira versão: login, dashboard e Kanban")
 
-    usuarios = load_users()
+usuarios = load_users()
+vendas = load_vendas()
+planos = load_planos()
 
-    if usuarios is not None:
-        email = st.text_input("E-mail")
+
+# ================ LOGIN =================
+if "rep_name" not in st.session_state:
+    with st.form("login_form"):
+        st.subheader("Login")
+        email = st.text_input("Email")
         senha = st.text_input("Senha", type="password")
+        submit_login = st.form_submit_button("Entrar")
 
-        if st.button("Entrar"):
-            user = login(email, senha, usuarios)
-            if user is not None:
-                st.session_state.usuario = {
-                    "nome": user["nome"],
-                    "representante": user["representante"]
-                }
-                st.rerun()
-            else:
-                st.error("❌ Usuário ou senha inválidos.")
-    st.stop()
+    if submit_login:
+        rep_name = authenticate(email, senha, usuarios)
+        if rep_name:
+            st.session_state["rep_name"] = rep_name
+            st.rerun()
+        else:
+            st.error("Email ou senha incorretos.")
+    st.stop()  # impede de carregar o painel sem login
 
-# =========================
-# A PARTIR DAQUI → USUÁRIO LOGADO
-# =========================
-user_name = st.session_state.usuario["nome"]
-rep_code = st.session_state.usuario["representante"]
 
-st.sidebar.success(f"✅ Logado como: **{user_name}**")
+# ================ PAINEL PRINCIPAL =================
+rep = st.session_state["rep_name"]
 
-# Botão de logout
-if st.sidebar.button("Logout"):
-    st.session_state.usuario = None
-    st.rerun()
+st.header(f"👋 Olá, {rep}!")
 
-# =========================
-# CARREGA VENDAS
-# =========================
-vendas = load_sales()
+df_rep = vendas[vendas["representante"] == rep]
 
-if vendas is None:
-    st.stop()
+meta_reais = st.sidebar.number_input("Meta da semana (R$)", value=100000.0)
+meta_clientes = st.sidebar.number_input("Meta de clientes atendidos", value=50)
+semana_num = st.sidebar.number_input("Semana nº", min_value=1, value=5)
 
-if rep_code != "ALL":
-    vendas = vendas[vendas["representante"] == rep_code]
+total_vendido = df_rep["valor_vendido"].sum()
+total_clientes = df_rep["cliente"].nunique()
 
-# =========================
-# DASHBOARD INICIAL
-# =========================
-st.title(f"📊 Diário de Bordo - Bem vindo, {user_name.split()[0]}!")
+pct_meta = (total_vendido / meta_reais) * 100 if meta_reais > 0 else 0
 
-meta_valor = st.sidebar.number_input("Meta da Semana (R$)", value=100000.0)
-meta_clientes = st.sidebar.number_input("Meta de Clientes", value=20)
+col1, col2, col3 = st.columns([3,2,2])
+with col1:
+    st.subheader(f"📆 Semana {semana_num}")
+    st.markdown(f"**Você atingiu {pct_meta:.1f}% da meta**")
+    st.progress(min(pct_meta/100, 1))
+with col2:
+    st.metric("R$ vendidos", f"R$ {total_vendido:,.2f}")
+with col3:
+    st.metric("Clientes atendidos", total_clientes)
 
-valor_atual = vendas["valor_vendido"].sum()
-clientes_atuais = vendas["cliente"].nunique()
+st.divider()
 
-col1, col2 = st.columns(2)
-col1.metric("Atingimento em R$", f"R$ {valor_atual:,.2f}", f"{(valor_atual/meta_valor)*100:.1f}%")
-col2.metric("Clientes atingidos", clientes_atuais, f"{(clientes_atuais/meta_clientes)*100:.1f}%")
+# ================ ALERTAS =================
+st.subheader("🔔 Alertas e prioridades")
 
-# =========================
-# TOP CLIENTES NÃO ATENDIDOS
-# =========================
-st.subheader("📍 Top 5 clientes não atendidos ainda")
-clientes_todos = vendas[["cliente", "cidade"]].drop_duplicates()
-clientes_atendidos = vendas["cliente"].unique()
+planos_rep = planos[planos["representante"] == rep]
 
-clientes_nao_atendidos = clientes_todos[~clientes_todos["cliente"].isin(clientes_atendidos)]
+c1, c2 = st.columns(2)
 
-if len(clientes_nao_atendidos) > 0:
-    st.table(clientes_nao_atendidos.head(5))
+with c1:
+    st.markdown("**Top 5 clientes com oportunidades (não concluído)**")
+    if not planos_rep.empty:
+        top = planos_rep[planos_rep["status_acao"] != "Concluído"].sort_values(
+            by="valor_vendido", ascending=False
+        ).head(5)[["cliente", "cidade", "valor_vendido", "acao_sugerida"]]
+        st.table(top.fillna(""))
+    else:
+        st.write("Nenhum cliente pendente.")
+
+with c2:
+    st.markdown("**Top 5 cidades com maior potencial**")
+    if not planos_rep.empty:
+        cities = planos_rep.groupby("cidade").agg({"valor_vendido":"sum"}).head(5)
+        st.table(cities)
+    else:
+        st.write("Sem ações pendentes.")
+
+
+st.divider()
+
+
+# ================ KANBAN =================
+st.subheader("🗂️ Kanban de ações")
+
+if planos_rep.empty:
+    st.info("Nenhuma ação cadastrada ainda.")
 else:
-    st.success("✅ Você já atendeu todos os clientes!")
+    statuses = ["A Fazer", "Em andamento", "Concluído"]
 
-# =========================
-# GRÁFICO DE BARRAS (VENDA POR CIDADE)
-# =========================
-st.subheader("🌎 Ranking de vendas por cidade")
+    # organiza o layout em colunas
+    col_a, col_b, col_c = st.columns(3)
+    col_dict = {"A Fazer": col_a, "Em andamento": col_b, "Concluído": col_c}
 
-vendas_cidade = vendas.groupby("cidade")["valor_vendido"].sum().reset_index()
+    for idx, row in planos_rep.reset_index().iterrows():
+        with col_dict.get(row["status_acao"], col_a):
+            st.markdown(f"""
+            **{row['cliente']}**  
+            {row.get('cidade','')} • {row.get('colecao','')}
+            """)
+            new_status = st.selectbox(
+                "Status",
+                statuses,
+                index=statuses.index(row["status_acao"]),
+                key=f"status_{idx}"
+            )
+            planos.loc[(planos["representante"] == rep) & (planos["cliente"] == row["cliente"]), "status_acao"] = new_status
 
-fig = px.bar(vendas_cidade, x="cidade", y="valor_vendido")
-st.plotly_chart(fig, use_container_width=True)
+            new_comment = st.text_area(
+                "Comentários",
+                value=row.get("comentarios", ""),
+                key=f"comment_{idx}"
+            )
+            planos.loc[(planos["representante"] == rep) & (planos["cliente"] == row["cliente"]), "comentarios"] = new_comment
+
+if st.button("Salvar atualizações"):
+    save_planos(planos)
+    st.success("Kanban atualizado com sucesso!")
+
+st.divider()
+
+st.caption("Versão MVP • Dados carregados de Excel • Em desenvolvimento 🚀")
 
 
 
