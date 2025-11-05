@@ -100,7 +100,7 @@ if st.session_state.logado:
         metas_rep = metas[metas["representante"] == representante]
 
         total_vendido = vendas_rep["valor_vendido"].sum()
-        meta_total = metas_rep["meta"].sum()
+        meta_total = metas_rep["meta_vendas"].sum()
         progresso = total_vendido / meta_total if meta_total > 0 else 0
 
         st.subheader("🎯 Progresso Geral da Meta")
@@ -175,6 +175,7 @@ if st.session_state.logado:
         st.session_state.logado = False
         st.session_state.pagina_atual = "Dashboard"
         st.success("✅ Logout realizado! Atualize a página para logar novamente.")
+
 
 
 
