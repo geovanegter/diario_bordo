@@ -1,151 +1,182 @@
+# ============================================================
+# Diário de Bordo - MVP
+# ============================================================
+# Estrutura esperada:
+# 📁 dados/
+#     ├── usuarios.xlsx  (colunas: representante, email, senha)
+#     ├── vendas.xlsx    (colunas: representante, cliente, cidade, colecao, marca, bairro, cep, qtd_pecas, valor_vendido, desconto, prazo)
+# ============================================================
+
 import streamlit as st
 import pandas as pd
+import numpy as np
+from pathlib import Path
 import plotly.express as px
 
-# ---------------------------
-# FUNÇÃO DE LOGIN
-# ---------------------------
-@st.cache_data
+# ---------------------- CONFIGURAÇÕES ----------------------
+st.set_page_config(page_title="Diário de Bordo", layout="wide")
+
+DATA_DIR = Path("dados")
+DATA_DIR.mkdir(exist_ok=True)
+
+USUARIOS_FILE = DATA_DIR / "usuarios.xlsx"
+VENDAS_FILE = DATA_DIR / "vendas.xlsx"
+PLANOS_FILE = DATA_DIR / "planos_acoes.xlsx"
+
+# ---------------------- FUNÇÕES AUXILIARES ----------------------
+
 def carregar_usuarios():
-    try:
-        return pd.read_excel("dados/usuarios.xlsx")
-    except:
-        st.error("⚠️ Arquivo dados/usuarios.xlsx não encontrado no repositório.")
-        return None
+    if not USUARIOS_FILE.exists():
+        exemplo = pd.DataFrame([
+            {"representante":"João Silva","email":"joao@example.com","senha":"1234"},
+            {"representante":"Maria Souza","email":"maria@example.com","senha":"abcd"},
+        ])
+        exemplo.to_excel(USUARIOS_FILE, index=False)
+    return pd.read_excel(USUARIOS_FILE)
 
-# ---------------------------
-# FUNÇÃO PARA CARREGAR PLANILHA DE VENDAS
-# ---------------------------
-@st.cache_data
 def carregar_vendas():
-    try:
-        return pd.read_excel("dados/vendas.xlsx")
-    except:
-        st.error("⚠️ Arquivo dados/vendas.xlsx não encontrado no repositório.")
+    if not VENDAS_FILE.exists():
+        exemplo = pd.DataFrame([
+            {"representante":"João Silva","cliente":"Loja A","cidade":"Jaraguá do Sul","colecao":"Verão 2025","marca":"Marca X","bairro":"Centro","cep":"89254-000","qtd_pecas":120,"valor_vendido":5800,"desconto":5,"prazo":"30/11/2025"},
+            {"representante":"Maria Souza","cliente":"Boutique Bela","cidade":"Joinville","colecao":"Inverno 2025","marca":"Marca Y","bairro":"América","cep":"89201-000","qtd_pecas":80,"valor_vendido":4300,"desconto":3,"prazo":"10/12/2025"},
+        ])
+        exemplo.to_excel(VENDAS_FILE, index=False)
+    return pd.read_excel(VENDAS_FILE)
+
+def carregar_planos():
+    if not PLANOS_FILE.exists():
+        df = pd.DataFrame(columns=[
+            "representante","cliente","acao_sugerida","status_acao","comentarios",
+            "cidade","colecao","marca","valor_vendido","qtd_pecas"
+        ])
+        df.to_excel(PLANOS_FILE, index=False)
+    return pd.read_excel(PLANOS_FILE)
+
+def salvar_planos(df):
+    df.to_excel(PLANOS_FILE, index=False)
+
+# ---------------------- AUTENTICAÇÃO ----------------------
+
+def authenticate(email, senha, usuarios_df):
+    if usuarios_df.empty:
+        st.error("⚠️ Nenhum usuário encontrado em usuarios.xlsx.")
         return None
 
+    # Normaliza
+    usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip().str.lower()
+    usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
 
-# ---------------------------
-# LOGIN
-# ---------------------------
-df_usuarios = carregar_usuarios()
+    email = str(email).strip().lower()
+    senha = str(senha).strip()
 
-if "usuario_logado" not in st.session_state:
-    st.session_state.usuario_logado = None
+    match = usuarios_df[
+        (usuarios_df["email"] == email) &
+        (usuarios_df["senha"] == senha)
+    ]
 
-if st.session_state.usuario_logado is None:
+    if not match.empty:
+        return match.iloc[0]["representante"]
 
-    st.title("🔐 Login — Diário de Bordo do Representante")
+    return None
 
-    email = st.text_input("E-mail")
-    senha = st.text_input("Senha", type="password")
+# ---------------------- LOGIN ----------------------
 
-    if st.button("Entrar"):
+usuarios_df = carregar_usuarios()
+vendas_df = carregar_vendas()
+planos_df = carregar_planos()
 
-        user_match = df_usuarios[
-            (df_usuarios["email"] == email) &
-            (df_usuarios["senha"] == senha)
-        ]
+st.title("📒 Diário de Bordo - MVP")
+st.markdown("Ferramenta simples para representantes comerciais.")
 
-        if len(user_match) > 0:
-            st.session_state.usuario_logado = user_match.iloc[0]["representante"]
-            st.rerun()
+if "rep_name" not in st.session_state:
+    with st.form("login_form"):
+        st.subheader("Login do Representante")
+        email = st.text_input("Email")
+        senha = st.text_input("Senha", type="password")
+        submitted = st.form_submit_button("Entrar")
+
+    if submitted:
+        rep_name = authenticate(email, senha, usuarios_df)
+        if rep_name is None:
+            st.error("❌ Email ou senha inválidos. Verifique usuarios.xlsx.")
         else:
-            st.error("❌ Usuário ou senha inválidos.")
-    st.stop()
-
-# ---------------------------
-# APÓS LOGIN
-# ---------------------------
-st.sidebar.success(f"✅ Usuário conectado: **{st.session_state.usuario_logado}**")
-
-df_vendas = carregar_vendas()
-
-# Filtrar vendas para o representante logado
-df_rep = df_vendas[df_vendas["representante"] == st.session_state.usuario_logado]
-
-st.title("📊 Diário de Bordo do Representante")
-
-# ---------------------------
-# PARÂMETROS DE META
-# ---------------------------
-st.sidebar.header("🎯 Metas da Semana")
-
-meta_rs = st.sidebar.number_input("Meta da Semana (R$)", value=100000.0)
-meta_clientes = st.sidebar.number_input("Meta de Clientes na Semana", value=20)
-
-# ---------------------------
-# CÁLCULOS
-# ---------------------------
-total_vendido = df_rep["valor_vendido"].sum()
-clientes_atendidos = df_rep["cliente"].nunique()
-
-pct_meta = total_vendido / meta_rs * 100 if meta_rs > 0 else 0
-pct_clientes = clientes_atendidos / meta_clientes * 100 if meta_clientes > 0 else 0
-
-# ---------------------------
-# DASHBOARD
-# ---------------------------
-st.subheader("📌 Resumo da Semana")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("Atingimento de Meta (R$)", f"R$ {total_vendido:,.2f}", f"{pct_meta:.1f}%")
-
-with col2:
-    st.metric("Clientes Atendidos", clientes_atendidos, f"{pct_clientes:.1f}%")
-
-st.progress(min(pct_meta / 100, 1.0))
-
-# ---------------------------
-# TOP CLIENTES NÃO ATENDIDOS
-# ---------------------------
-df_todos_clientes = df_vendas["cliente"].unique()
-df_meus_clientes = df_rep["cliente"].unique()
-
-clientes_nao_atendidos = list(set(df_todos_clientes) - set(df_meus_clientes))
-
-st.subheader("🚫 Top 5 Clientes Não Atendidos")
-if len(clientes_nao_atendidos) > 0:
-    st.write(clientes_nao_atendidos[:5])
+            st.session_state["rep_name"] = rep_name
+            st.success(f"✅ Login realizado! Bem-vindo, {rep_name}.")
+            st.rerun()
 else:
-    st.success("✅ Você já atendeu todos os clientes!")
+    rep = st.session_state["rep_name"]
+    st.sidebar.success(f"Logado como: {rep}")
+    st.sidebar.button("Sair", on_click=lambda: st.session_state.pop("rep_name"))
 
-# ---------------------------
-# TOP 5 CIDADES NÃO ATENDIDAS
-# ---------------------------
-df_cidades = df_vendas[~df_vendas["cliente"].isin(df_meus_clientes)]
-top_cidades = (
-    df_cidades.groupby("cidade")["cliente"]
-    .nunique()
-    .sort_values(ascending=False)
-    .head(5)
-)
+    # ---------------------- DADOS DO REPRESENTANTE ----------------------
+    vendas_rep = vendas_df[vendas_df["representante"] == rep].copy()
+    planos_rep = planos_df[planos_df["representante"] == rep].copy()
 
-st.subheader("🏙️ Top 5 Cidades com Oportunidade")
-st.write(top_cidades)
+    if vendas_rep.empty:
+        st.warning("Nenhuma venda encontrada para você em vendas.xlsx.")
+    else:
+        total_vendido = vendas_rep["valor_vendido"].sum()
+        total_pecas = vendas_rep["qtd_pecas"].sum()
+        total_clientes = vendas_rep["cliente"].nunique()
 
-# ---------------------------
-# RANKING DE REPRESENTANTES
-# ---------------------------
-ranking = (
-    df_vendas.groupby("representante")["valor_vendido"]
-    .sum()
-    .sort_values(ascending=False)
-    .reset_index()
-)
+        st.header(f"Bem-vindo, {rep} 👋")
+        st.metric("💰 Total Vendido", f"R$ {total_vendido:,.2f}")
+        st.metric("🧦 Peças Vendidas", f"{total_pecas:,}")
+        st.metric("👥 Clientes Atendidos", f"{total_clientes}")
 
-ranking["posicao"] = ranking.index + 1
+        st.markdown("---")
+        st.subheader("📊 Desempenho por cidade")
+        fig = px.bar(vendas_rep, x="cidade", y="valor_vendido", color="marca", title="Vendas por Cidade e Marca")
+        st.plotly_chart(fig, use_container_width=True)
 
-minha_posicao = ranking[ranking["representante"] == st.session_state.usuario_logado]["posicao"].values[0]
+        # ---------------------- KANBAN SIMPLES ----------------------
+        st.markdown("---")
+        st.subheader("🗂️ Ações e Pendências")
 
-st.subheader("🏆 Ranking de Representantes")
-st.write(f"Você está na **posição {int(minha_posicao)}** do ranking 🎯")
+        if planos_rep.empty:
+            st.info("Nenhuma ação registrada. Você pode criar novas ações abaixo.")
+        else:
+            for i, row in planos_rep.iterrows():
+                st.markdown(f"**{row['cliente']}** — {row.get('acao_sugerida','(sem ação)')}")
+                novo_status = st.selectbox(
+                    "Status",
+                    ["A Fazer", "Em andamento", "Concluído"],
+                    index=["A Fazer", "Em andamento", "Concluído"].index(row.get("status_acao","A Fazer")),
+                    key=f"status_{i}"
+                )
+                planos_df.loc[i, "status_acao"] = novo_status
+                comentario = st.text_area("Comentário", value=row.get("comentarios",""), key=f"coment_{i}")
+                planos_df.loc[i, "comentarios"] = comentario
+                st.markdown("---")
 
-fig_ranking = px.bar(ranking, x="representante", y="valor_vendido", title="Ranking de Vendas")
-st.plotly_chart(fig_ranking)
+            if st.button("💾 Salvar Alterações"):
+                salvar_planos(planos_df)
+                st.success("Alterações salvas com sucesso!")
 
+        # ---------------------- CRIAR NOVA AÇÃO ----------------------
+        with st.expander("➕ Adicionar nova ação"):
+            cliente = st.text_input("Cliente")
+            acao = st.text_input("Ação sugerida")
+            if st.button("Adicionar"):
+                novo = pd.DataFrame([{
+                    "representante": rep,
+                    "cliente": cliente,
+                    "acao_sugerida": acao,
+                    "status_acao": "A Fazer",
+                    "comentarios": ""
+                }])
+                planos_df = pd.concat([planos_df, novo], ignore_index=True)
+                salvar_planos(planos_df)
+                st.success("Ação adicionada!")
+                st.rerun()
+
+    # ---------------------- RANKING ----------------------
+    st.markdown("---")
+    st.subheader("🏆 Ranking de Vendas")
+    ranking = vendas_df.groupby("representante")["valor_vendido"].sum().reset_index()
+    ranking = ranking.sort_values("valor_vendido", ascending=False).reset_index(drop=True)
+    ranking["Posição"] = ranking.index + 1
+    st.table(ranking)
 
 
 
