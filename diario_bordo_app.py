@@ -58,19 +58,28 @@ colecoes_df.columns = [c.strip().lower() for c in colecoes_df.columns]
 # -------------------------
 # Autenticação (usa users_df)
 # -------------------------
-def authenticate(email: str, senha: str):
-    if users_df.empty:
-        return None
-    email = (email or "").strip().lower()
-    senha = (senha or "").strip()
-    match = users_df[
-        (users_df["email"] == email) &
-        (users_df["senha"] == senha)
+def authenticate(email, senha):
+    """Valida login na planilha de usuários e retorna os dados do usuário."""
+    usuarios = pd.read_excel(USUARIOS_FILE)
+
+    usuarios.columns = usuarios.columns.str.strip().str.lower()
+
+    match = usuarios[
+        (usuarios["email"].str.lower() == email.lower()) &
+        (usuarios["senha"].astype(str) == str(senha))
     ]
-    if not match.empty:
-        row = match.iloc[0]
-        return {"email": row["email"], "nome": row.get("nome", ""), "representante": row.get("representante", "")}
-    return None
+
+    if match.empty:
+        return None
+
+    row = match.iloc[0]
+
+    return {
+        "email": row["email"],
+        "representante": row["representante"],
+        "nome": row.get("nome", row["representante"])
+    }
+
 
 # -------------------------
 # LOGIN (sem st.form)
@@ -103,7 +112,7 @@ if st.button("Entrar"):
 # USUÁRIO LOGADO — UI PRINCIPAL
 # -------------------------
 user = st.session_state.user
-rep = user.get("representante", "")
+rep = st.session_state.user["representante"]
 st.sidebar.markdown(f"**Logado como:** {user.get('nome') or user['email']}  \n**Rep:** {rep}")
 
 # -------------------------
@@ -243,5 +252,6 @@ elif view == "Clientes":
     view_clientes()
 elif view == "Dossiê Cliente":
     view_dossie()
+
 
 
