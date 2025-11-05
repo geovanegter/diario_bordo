@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import streamlit as st
+
+st.write("Versão do Streamlit:", st.__version__)
 
 st.set_page_config(page_title="📘 Diário de Bordo Comercial", layout="wide")
 
@@ -188,3 +191,4 @@ if st.sidebar.button("Logout"):
     st.session_state.user = None
     st.session_state.logado = False
     st.experimental_rerun()
+
