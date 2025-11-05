@@ -111,9 +111,23 @@ else:
     # ---------------------- DADOS DO REPRESENTANTE ----------------------
     vendas_rep = vendas_df[vendas_df["representante"] == rep].copy()
     if "representante" in planos_df.columns:
+    # garantir que planos_df existe e tem colunas mínimas
+if planos_df is None or (isinstance(planos_df, pd.DataFrame) and planos_df.empty):
+    planos_df = pd.DataFrame(columns=[
+        "representante","cliente","cidade","colecao","marca","bairro","cep",
+        "qtd_pecas","valor_vendido","desconto","prazo","acao_sugerida","status_acao","comentarios"
+    ])
+
+# padroniza nomes de coluna (lower + strip) para evitar problemas de casing/espaços
+planos_df.columns = [c.lower().strip() for c in planos_df.columns]
+
+# filtra planos para o representante atual (se a coluna existir)
+if "representante" in planos_df.columns:
     planos_rep = planos_df[planos_df["representante"] == rep].copy()
 else:
-    planos_rep = pd.DataFrame(columns=["representante", "cliente", "cidade", "acao", "status"])
+    # cria dataframe vazio com as colunas padronizadas para não quebrar o fluxo
+    planos_rep = pd.DataFrame(columns=planos_df.columns)
+
 
 
     if vendas_rep.empty:
@@ -181,6 +195,7 @@ else:
     ranking = ranking.sort_values("valor_vendido", ascending=False).reset_index(drop=True)
     ranking["Posição"] = ranking.index + 1
     st.table(ranking)
+
 
 
 
