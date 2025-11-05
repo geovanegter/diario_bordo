@@ -110,7 +110,11 @@ else:
 
     # ---------------------- DADOS DO REPRESENTANTE ----------------------
     vendas_rep = vendas_df[vendas_df["representante"] == rep].copy()
+    if "representante" in planos_df.columns:
     planos_rep = planos_df[planos_df["representante"] == rep].copy()
+else:
+    planos_rep = pd.DataFrame(columns=["representante", "cliente", "cidade", "acao", "status"])
+
 
     if vendas_rep.empty:
         st.warning("Nenhuma venda encontrada para você em vendas.xlsx.")
@@ -177,6 +181,7 @@ else:
     ranking = ranking.sort_values("valor_vendido", ascending=False).reset_index(drop=True)
     ranking["Posição"] = ranking.index + 1
     st.table(ranking)
+
 
 
 
