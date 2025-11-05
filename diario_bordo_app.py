@@ -2,170 +2,153 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 
-# ============================================
-# CONFIGURAÇÃO INICIAL
-# ============================================
-st.set_page_config(page_title="Diário de Bordo", layout="wide")
+# ======================================================
+# CONFIGURAÇÕES
+# ======================================================
 
-EXCEL_FILE = "dados"  # <-- ajuste aqui se estiver em outro caminho
+st.set_page_config(
+    page_title="Diário de Bordo",
+    page_icon="📋",
+    layout="wide"
+)
 
-# ============================================
-# FUNÇÃO PARA CARREGAR PLANILHAS
-# ============================================
+DATA_FOLDER = Path("dados")  # Pasta onde estão os arquivos
+
+# ======================================================
+# FUNÇÕES DE CARREGAMENTO
+# ======================================================
+
 @st.cache_data
-def load_excel():
-    if not Path(EXCEL_FILE).exists():
-        st.error(f"❌ Não encontrei o arquivo: {EXCEL_FILE}")
-        return None
+def carregar_planilha(nome_arquivo):
+    caminho = DATA_FOLDER / nome_arquivo
+    if not caminho.exists():
+        st.error(f"❌ Arquivo não encontrado: `{nome_arquivo}` dentro da pasta /dados")
+        return pd.DataFrame()
+    return pd.read_excel(caminho)
 
-    xls = pd.ExcelFile(EXCEL_FILE)
 
-    data = {
-        "usuarios": pd.read_excel(xls, "usuarios"),
-        "planos": pd.read_excel(xls, "planos"),
-        "colecoes": pd.read_excel(xls, "colecoes"),
-        "clientes": pd.read_excel(xls, "clientes"),
-        "semana": pd.read_excel(xls, "semana")
+def carregar_dados():
+    return {
+        "usuarios": carregar_planilha("usuarios.xlsx"),
+        "vendas": carregar_planilha("vendas.xlsx"),
+        "clientes": carregar_planilha("clientes.xlsx"),
+        "metas": carregar_planilha("metas_colecao.xlsx"),
+        "colecoes": carregar_planilha("colecoes.xlsx")
     }
-    return data
 
-
-data = load_excel()
-if data is None:
-    st.stop()
-
-
-# ============================================
+# ======================================================
 # AUTENTICAÇÃO
-# ============================================
-def autenticar(email, senha):
-    usuarios = data["usuarios"]
+# ======================================================
 
-    user = usuarios[
-        (usuarios["email"] == email) & (usuarios["senha"] == senha)
+def autenticar(email, senha, df_usuarios):
+    usuario = df_usuarios[
+        (df_usuarios["email"] == email) &
+        (df_usuarios["senha"] == senha)
     ]
-
-    if len(user) == 1:
-        d = user.iloc[0].to_dict()
-        return d
+    if len(usuario) > 0:
+        return usuario.iloc[0].to_dict()
     return None
 
 
-# cria session state
-if "user" not in st.session_state:
-    st.session_state.user = None
+# ======================================================
+# INÍCIO DO APP
+# ======================================================
+
+dados = carregar_dados()
+usuarios_df = dados["usuarios"]
+
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
 
 
-# ============================================
-# TELA DE LOGIN
-# ============================================
-if st.session_state.user is None:
+if st.session_state.usuario is None:
     st.title("🔐 Diário de Bordo — Login")
 
-    with st.form("login_form"):
+    with st.form("login"):
         email = st.text_input("E-mail")
         senha = st.text_input("Senha", type="password")
         submit = st.form_submit_button("Entrar")
 
         if submit:
-            user = autenticar(email, senha)
+            user = autenticar(email, senha, usuarios_df)
+
             if user:
-                st.session_state.user = user  # salva o dicionário inteiro
-                st.success(f"Bem-vindo(a), {user['representante']}!")
+                st.session_state.usuario = user
+                st.success(f"✅ Bem-vindo(a), **{user['nome']}**!")
                 st.rerun()
             else:
-                st.error("❌ Usuário ou senha inválidos.")
-
+                st.error("❌ Usuário ou senha incorretos")
     st.stop()
 
 
-# ============================================
-# APLICATIVO PRINCIPAL
-# ============================================
-user = st.session_state.user
-rep = user["representante"]
+# ======================================================
+# ÁREA LOGADA
+# ======================================================
 
-st.sidebar.title("📌 Navegação")
-pagina = st.sidebar.radio(
-    "",
-    ["Visão geral", "Meus Objetivos", "Clientes", "Dossiê Cliente"]
-)
+usuario = st.session_state.usuario
+st.sidebar.title(f"👤 {usuario['nome']}")
+st.sidebar.write(f"📧 {usuario['email']}")
 
-st.sidebar.markdown("---")
-st.sidebar.write(f"👤 **{rep}**")
-if st.sidebar.button("Sair"):
-    st.session_state.user = None
-    st.rerun()
+pagina = st.sidebar.radio("Navegação", ["Visão Geral", "Meus Objetivos", "Clientes", "Dossiê Cliente"])
 
+st.sidebar.button("🔓 Logout", on_click=lambda: st.session_state.update({"usuario": None}))
+st.title("📊 Diário de Bordo — Dashboard")
 
-# ============================================
-# VISÃO GERAL (Dashboard)
-# ============================================
-if pagina == "Visão geral":
-    st.title(f"🚀 Bem-vindo(a), {rep}!")
+# ======================================================
+# LÓGICA DE CONSULTA — APÓS LOGIN
+# ======================================================
 
-    planos_df = data["planos"]
-    colecoes_df = data["colecoes"]
+vendas_df = dados["vendas"]
+metas_df = dados["metas"]
 
-    planos_rep = planos_df[planos_df["representante"] == rep].copy()
-    colecao_atual = colecoes_df[colecoes_df["ativa"] == "sim"].iloc[0]
+rep = usuario["representante"]
+
+vendas_rep = vendas_df[vendas_df["representante"] == rep]
+metas_rep = metas_df[metas_df["representante"] == rep]
+
+# ======================================================
+# PÁGINAS
+# ======================================================
+
+if pagina == "Visão Geral":
+    st.subheader("📌 Visão Geral do Representante")
 
     col1, col2 = st.columns(2)
 
-    # --- Bloco vendas coleção ---
-    meta_vendas = int(planos_rep["meta_vendas"].sum())
-    vendas_realizadas = int(planos_rep["vendas_realizadas"].sum())
-    perc_vendas = vendas_realizadas / meta_vendas if meta_vendas > 0 else 0
+    # meta coleção
+    meta_valor = float(metas_rep["meta_vendas"].sum())
+    realizado = float(vendas_rep["valor_vendido"].sum())
+    progresso = realizado / meta_valor if meta_valor > 0 else 0
 
     with col1:
-        st.subheader("📊 Meta de vendas da coleção")
-        st.progress(perc_vendas)
-        st.metric("Meta de vendas", f"R$ {meta_vendas:,.0f}".replace(",", "."))
-        st.metric("Vendido", f"R$ {vendas_realizadas:,.0f}".replace(",", "."))
-        st.metric("Falta vender", f"R$ {(meta_vendas - vendas_realizadas):,.0f}".replace(",", "."))
+        st.write("💰 Meta de Vendas da Coleção")
+        st.progress(progresso)
+        st.write(f"**Meta:** R$ {meta_valor:,.2f}")
+        st.write(f"**Vendido:** R$ {realizado:,.2f}")
+        st.write(f"**Falta:** R$ {meta_valor - realizado:,.2f}")
 
-    # --- Bloco clientes coleção ---
-    clientes_meta = int(planos_rep["meta_clientes"].sum())
-    clientes_atendidos = int(planos_rep["clientes_atendidos"].sum())
-    perc_clientes = clientes_atendidos / clientes_meta if clientes_meta > 0 else 0
+    meta_cli = int(metas_rep["meta_clientes"].sum())
+    clientes_atendidos = vendas_rep["cliente"].nunique()
+    progresso_cli = clientes_atendidos / meta_cli if meta_cli > 0 else 0
 
     with col2:
-        st.subheader("🙋 Clientes atendidos na coleção")
-        st.progress(perc_clientes)
-        st.metric("Meta clientes", clientes_meta)
-        st.metric("Atendidos", clientes_atendidos)
-        st.metric("Faltam", clientes_meta - clientes_atendidos)
+        st.write("🧾 Meta de Clientes")
+        st.progress(progresso_cli)
+        st.write(f"**Meta:** {meta_cli} clientes")
+        st.write(f"**Atendidos:** {clientes_atendidos}")
+        st.write(f"**Faltam:** {meta_cli - clientes_atendidos}")
 
-
-# ============================================
-# MEUS OBJETIVOS
-# ============================================
-elif pagina == "Meus Objetivos":
-    st.title("🎯 Meus Objetivos")
-    planos_rep = data["planos"][data["planos"]["representante"] == rep]
-    st.dataframe(planos_rep)
-
-
-# ============================================
-# CLIENTES
-# ============================================
 elif pagina == "Clientes":
-    st.title("📋 Lista de clientes")
-    clientes_rep = data["clientes"][data["clientes"]["representante"] == rep]
-    st.dataframe(clientes_rep)
+    st.subheader("📋 Clientes atendidos na coleção")
+    st.dataframe(vendas_rep)
 
-
-# ============================================
-# Dossiê Cliente
-# ============================================
 elif pagina == "Dossiê Cliente":
-    st.title("🗂️ Dossiê do Cliente")
-    clientes_rep = data["clientes"][data["clientes"]["representante"] == rep]
+    st.subheader("📚 Dossiê do Cliente")
+    cliente = st.selectbox("Selecione um cliente", vendas_rep["cliente"].unique())
+    st.dataframe(vendas_rep[vendas_rep["cliente"] == cliente])
 
-    cliente_select = st.selectbox("Selecione um cliente:", clientes_rep["cliente"])
-    cliente_infos = clientes_rep[clientes_rep["cliente"] == cliente_select].iloc[0].to_dict()
-
-    st.write("📌 **Informações do cliente:**")
-    st.json(cliente_infos)
+else:
+    st.subheader("🎯 Meus Objetivos")
+    st.dataframe(metas_rep)
 
 
