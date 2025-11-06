@@ -7,7 +7,6 @@ st.set_page_config(page_title="📘 Diário de Bordo Comercial", layout="wide")
 # -------------------------------
 # Funções
 # -------------------------------
-
 @st.cache_data
 def carregar_planilhas():
     planilhas = {}
@@ -61,12 +60,16 @@ def autenticar(email, senha):
         return user.iloc[0].to_dict()
     return None
 
-# Função utilitária para evitar KeyError
 def coluna_valor_existe(df, coluna):
     if coluna in df.columns:
         return df[coluna]
     else:
         return pd.Series([0]*len(df))
+
+# Função para colorir status
+def cor_status(status):
+    cores = {"Concluído":"#28a745", "Em andamento":"#ffc107", "Pendente":"#dc3545"}
+    return cores.get(status, "#6c757d")
 
 # -------------------------------
 # Carrega planilhas
@@ -110,22 +113,22 @@ if st.session_state.logado:
     representante = user.get("representante", "Não definido")
     nome_usuario = user.get("nome", "Usuário")
 
+    # -------------------------------
+    # Sidebar com menu ativo
+    # -------------------------------
     st.sidebar.title(f"👋 Olá, {nome_usuario}")
     st.sidebar.write(f"Representante: **{representante}**")
 
-    # -------------------------------
-    # Navegação por botões
-    # -------------------------------
-    st.sidebar.write("## Navegação")
     paginas = ["Dashboard", "Registrar visita", "Plano de Ação", "Coleções / Metas"]
+    st.sidebar.write("## Menu")
     for p in paginas:
-        if st.sidebar.button(p):
+        if st.sidebar.button(f"{'👉 ' if st.session_state.get('pagina_atual')==p else ''}{p}"):
             st.session_state["pagina_atual"] = p
 
     pagina = st.session_state.get("pagina_atual", "Dashboard")
 
     # -------------------------------
-    # DASHBOARD
+    # DASHBOARD MODERNO
     # -------------------------------
     if pagina == "Dashboard":
         st.title("📊 Dashboard Comercial")
@@ -135,14 +138,20 @@ if st.session_state.logado:
         vendas_rep = vendas[vendas.get("representante", "") == representante]
         metas_rep = metas[metas.get("representante", "") == representante]
 
-        total_vendido = coluna_valor_existe(vendas_rep, "valor_vendido").sum()
-        meta_total = coluna_valor_existe(metas_rep, "meta_vendas").sum()
+        total_vendido = coluna_valor_existe(vendas_rep, "valor").sum()
+        meta_total = coluna_valor_existe(metas_rep, "meta").sum()
         progresso = total_vendido / meta_total if meta_total > 0 else 0
 
-        st.subheader("🎯 Progresso Geral da Meta")
-        st.progress(progresso)
-        st.metric("Total vendido", f"R$ {total_vendido:,.2f}".replace(",", "."))
-        st.metric("Meta do período", f"R$ {meta_total:,.2f}".replace(",", "."))
+        col1, col2, col3 = st.columns(3)
+        col1.metric("💰 Total Vendido", f"R$ {total_vendido:,.2f}".replace(",", "."))
+        col2.metric("🎯 Meta Período", f"R$ {meta_total:,.2f}".replace(",", "."))
+        col3.progress(progresso)
+
+        # Gráfico simples de vendas por coleção
+        vendas_por_colecao = vendas_rep.groupby("colecao")["valor"].sum()
+        if not vendas_por_colecao.empty:
+            st.subheader("📈 Vendas por Coleção")
+            st.bar_chart(vendas_por_colecao)
 
     # -------------------------------
     # REGISTRAR VISITA
@@ -153,10 +162,11 @@ if st.session_state.logado:
         colecoes = dfs["colecoes"]
 
         with st.form("form_visita"):
-            cliente = st.text_input("Cliente")
-            colecao = st.selectbox("Coleção", colecoes["colecao"].unique())
+            col1, col2 = st.columns(2)
+            cliente = col1.text_input("Cliente")
+            colecao = col2.selectbox("Coleção", colecoes["colecao"].unique())
             valor = st.number_input("Valor do pedido (R$)", step=100.0)
-            enviado = st.form_submit_button("Salvar registro")
+            enviado = st.form_submit_button("💾 Salvar registro")
 
             if enviado:
                 novo = pd.DataFrame([{
@@ -177,7 +187,16 @@ if st.session_state.logado:
         st.title("🚀 Plano de Ação Comercial")
         planos = dfs["planos"]
         planos_rep = planos[planos.get("responsavel", "") == representante]
-        st.table(planos_rep)
+
+        if planos_rep.empty:
+            st.info("Nenhum plano de ação para este representante.")
+        else:
+            # tabela com cores no status
+            def style_status(val):
+                color = cor_status(val)
+                return f'background-color: {color}; color: white; font-weight: bold'
+
+            st.dataframe(planos_rep.style.applymap(style_status, subset=["status"]))
 
     # -------------------------------
     # COLEÇÕES / METAS
@@ -202,16 +221,15 @@ if st.session_state.logado:
             ).sum()
 
             progresso = vendido / meta if meta > 0 else 0
-            st.write(f"### {colecao}")
+            st.subheader(f"📦 {colecao}")
             st.progress(progresso)
             st.write(f"Vendido: **R$ {vendido:,.2f}** de R$ {meta:,.2f}".replace(",", "."))
 
     # -------------------------------
     # LOGOUT
     # -------------------------------
-    if st.sidebar.button("Logout"):
+    if st.sidebar.button("🚪 Logout"):
         st.session_state.user = None
         st.session_state.logado = False
         st.session_state.pagina_atual = "Dashboard"
         st.success("✅ Logout realizado! Atualize a página para logar novamente.")
-
