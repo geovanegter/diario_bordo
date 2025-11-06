@@ -9,7 +9,7 @@ st.set_page_config(page_title="📘 Diário de Bordo", layout="wide")
 def autenticar_usuario(usuario, senha):
     try:
         usuarios = pd.read_excel("dados/usuarios.xlsx")
-        dados_usuario = usuarios.loc[usuarios["usuario"] == usuario]
+        dados_usuario = usuarios.loc[usuarios["representante"] == usuario]
         if not dados_usuario.empty and dados_usuario.iloc[0]["senha"] == senha:
             return dados_usuario.iloc[0]["nome"]
         return None
@@ -154,3 +154,4 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
