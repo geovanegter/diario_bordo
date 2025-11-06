@@ -123,20 +123,20 @@ week_rows = meta_semanal[meta_semanal["colecao"].isin(
 if not week_rows.empty:
     for _, row in week_rows.iterrows():
         colecao = row["colecao"]
-        semana_inicio = pd.to_datetime(row["semana_inicio"]).date()
-        semana_fim = pd.to_datetime(row["semana_fim"]).date()
         percentual_meta = row["percentual_da_meta"]
 
-        # Vendas na semana
-        vendas_semana = vendas_rep[
-            (pd.to_datetime(vendas_rep.get("data", pd.Series(datetime.today()))) >= semana_inicio) &
-            (pd.to_datetime(vendas_rep.get("data", pd.Series(datetime.today()))) <= semana_fim)
-        ]["valor_vendido"].sum()
+        # Total vendido da coleção (sem filtro por semana, pois não há data)
+        vendido = vendas_rep[vendas_rep["colecao"] == colecao]["valor_vendido"].sum()
+
+        # Progresso em relação à meta semanal
+        progresso = vendido / (percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == colecao, 'meta_vendas'].values[0])
+        progresso = min(progresso, 1.0)
 
         st.markdown(f"**Coleção {colecao}** — {percentual_meta}% da meta da semana")
-        st.progress(min(vendas_semana / (percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == colecao, 'meta_vendas'].values[0]),1.0))
+        st.progress(progresso)
 
         ticket_medio = calcular_ticket_medio(representante)
-        clientes_restantes = max((percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == colecao, 'meta_vendas'].values[0]) / ticket_medio - vendas_semana / ticket_medio,0)
-        st.markdown(f"Vendas semanais realizadas: R$ {vendas_semana:,.2f}")
+        clientes_restantes = max((percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == colecao, 'meta_vendas'].values[0]) / ticket_medio - vendido / ticket_medio,0)
+        st.markdown(f"Vendas semanais realizadas: R$ {vendido:,.2f}")
         st.markdown(f"Clientes a atender nesta semana: {clientes_restantes:.0f}")
+
