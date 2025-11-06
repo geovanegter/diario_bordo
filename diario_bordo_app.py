@@ -170,7 +170,7 @@ if st.session_state.pagina_atual == "Dashboard":
     dias_no_mes = 30
     dias_restantes = dias_no_mes - hoje
 
-    falta_vender = max(meta_vendas - total_vendido, 0)
+    falta_vender = max(meta_valor - total_vendido, 0)
     vender_por_dia = falta_vender / dias_restantes if dias_restantes > 0 else falta_vender
 
     falta_clientes = max(meta_clientes - total_clientes, 0)
@@ -217,6 +217,7 @@ elif st.session_state.pagina_atual == "Plano de Ação":
 elif st.session_state.pagina_atual == "Metas":
     st.markdown("### 🎯 Metas e Coleções")
     st.dataframe(metas_df[metas_df["representante"] == representante])
+
 
 
 
