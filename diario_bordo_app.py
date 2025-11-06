@@ -1,218 +1,159 @@
-# ---------- BLOCO SEGURO DE AUTENTICAÇÃO ----------
 import streamlit as st
 import pandas as pd
-from pathlib import Path
+from datetime import datetime
+import pytz
+import os
 
-# inicializa session_state básico (evita AttributeError)
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "pagina" not in st.session_state:
-    st.session_state.pagina = "Dashboard"
+# ────────────────────────────────────────────────────────────────
+# CONFIGURAÇÕES INICIAIS
+# ────────────────────────────────────────────────────────────────
 
-DATA_DIR = Path("dados")
-USERS_PATH = DATA_DIR / "usuarios.xlsx"
+st.set_page_config(page_title="📒 Diário de Bordo", layout="wide")
 
-# Função para carregar e mostrar colunas para debug
-def carregar_usuarios_debug(path):
-    if not path.exists():
-        st.error(f"Arquivo não encontrado: {path}")
-        return pd.DataFrame()
-    try:
-        df = pd.read_excel(path)
-        # normaliza nomes de coluna: strip
-        df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Erro ao ler {path.name}: {e}")
-        return pd.DataFrame()
-
-# Carrega usuarios (uma vez)
-usuarios_df = carregar_usuarios_debug(USERS_PATH)
-
-# Mostra colunas (remove comentário se quiser checar)
-# st.write("Colunas em usuarios.xlsx:", usuarios_df.columns.tolist())
-
-def autenticar(email, senha):
-    """Retorna dict do usuário se encontrado, senão None."""
-    if usuarios_df.empty:
-        return None
-
-    # normaliza colunas com segurança
-    cols = [c.lower().strip() for c in usuarios_df.columns]
-    # procura coluna email e senha nas variações comuns
-    email_col = next((c for c in usuarios_df.columns if c.lower().strip() in ("email","e-mail","usuario","user","login")), None)
-    senha_col = next((c for c in usuarios_df.columns if c.lower().strip() in ("senha","password","pass")), None)
-    rep_col = next((c for c in usuarios_df.columns if c.lower().strip() in ("representante","rep","nome")), None)
-
-    if email_col is None or senha_col is None:
-        st.error("Colunas de autenticação não encontradas em usuarios.xlsx. Esperado: 'email' e 'senha'.")
-        return None
-
-    # compara de forma segura
-    try:
-        df = usuarios_df.copy()
-        df[email_col] = df[email_col].astype(str).str.strip()
-        df[senha_col] = df[senha_col].astype(str).str.strip()
-    except Exception:
-        df = usuarios_df.copy()
-
-    filtro = (df[email_col].str.lower() == str(email).strip().lower()) & (df[senha_col] == str(senha).strip())
-    matched = df[filtro]
-
-    if len(matched) == 1:
-        row = matched.iloc[0].to_dict()
-        # garante campo representante
-        if rep_col:
-            row_rep = matched.iloc[0].get(rep_col)
-            row["representante"] = row_rep if pd.notna(row_rep) else row.get(email_col)
-        else:
-            row["representante"] = row.get(email_col)
-        # padroniza keys para o app
-        return {
-            "email": row.get(email_col),
-            "representante": row.get("representante"),
-            **{k: row.get(k) for k in usuarios_df.columns if k not in (email_col, senha_col)}
-        }
-    return None
-
-# Tela de login segura (substitui blocos anteriores)
-if not st.session_state.logado:
-    st.markdown("<h2 style='text-align:center;'>🔐 Diário de Bordo — Login</h2>", unsafe_allow_html=True)
-    with st.form("login_form"):
-        email_input = st.text_input("E-mail")
-        senha_input = st.text_input("Senha", type="password")
-        submit = st.form_submit_button("Entrar")
-
-    if submit:
-        user = autenticar(email_input, senha_input)
-        if user:
-            st.session_state.logado = True
-            st.session_state.user = user
-            # Define pagina padrão
-            st.session_state.pagina = "Dashboard"
-            st.rerun()  # NOTA: usar st.rerun(), não experimental_rerun
-        else:
-            st.error("E-mail ou senha inválidos. Verifique planilha usuarios.xlsx e tente novamente.")
-    st.stop()
-# ---------- FIM BLOCO AUTENTICAÇÃO ----------
-
-
-# ======= SE CHEGOU AQUI, ESTÁ LOGADO =======
-st.sidebar.title(f"👋 Olá, {st.session_state['nome']}")
-if st.sidebar.button("Sair"):
+# Inicializa session_state
+if "autenticado" not in st.session_state:
     st.session_state["autenticado"] = False
+
+if "nome" not in st.session_state:
+    st.session_state["nome"] = ""
+
+if "email" not in st.session_state:
+    st.session_state["email"] = ""
+
+# ────────────────────────────────────────────────────────────────
+# FUNÇÃO DE CARREGAMENTO DE PLANILHAS
+# ────────────────────────────────────────────────────────────────
+def carregar_planilha(nome_arquivo):
+    caminho = os.path.join("dados", nome_arquivo)
+    if not os.path.exists(caminho):
+        st.error(f"❌ Arquivo não encontrado: {caminho}")
+        return pd.DataFrame()
+
+    return pd.read_excel(caminho)
+
+# Carregar dados
+df_usuarios = carregar_planilha("usuarios.xlsx")
+df_diario = carregar_planilha("diario_bordo.xlsx")
+df_metas = carregar_planilha("metas_colecao.xlsx")
+
+# ────────────────────────────────────────────────────────────────
+# LOGIN
+# ────────────────────────────────────────────────────────────────
+
+def tela_login():
+    st.title("🔐 Acesso ao Diário de Bordo")
+
+    email = st.text_input("E-mail:")
+    senha = st.text_input("Senha:", type="password")
+
+    if st.button("Entrar", use_container_width=True):
+        usuario = df_usuarios[
+            (df_usuarios["email"] == email) &
+            (df_usuarios["senha"] == senha)
+        ]
+
+        if not usuario.empty:
+            st.session_state["autenticado"] = True
+            st.session_state["nome"] = usuario.iloc[0]["nome"]
+            st.session_state["email"] = email
+
+            st.success("✅ Login realizado com sucesso!")
+            st.experimental_rerun()
+        else:
+            st.error("❌ Usuário ou senha inválidos.")
+
+# Se o usuário não estiver autenticado, mostra a tela de login
+if not st.session_state["autenticado"]:
+    tela_login()
+    st.stop()
+
+# ────────────────────────────────────────────────────────────────
+# SIDEBAR
+# ────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.title(f"👋 Olá, {st.session_state.get('nome', 'Usuário')}")
+    if st.button("Logout"):
+        st.session_state["autenticado"] = False
+        st.experimental_rerun()
+
+# ────────────────────────────────────────────────────────────────
+# DASHBOARD PRINCIPAL
+# ────────────────────────────────────────────────────────────────
+st.title("📊 Painel do Representante")
+
+# Filtro pelo usuário logado
+df_usuario = df_diario[df_diario["email"] == st.session_state["email"]]
+
+# Resumo da semana
+hoje = datetime.now(pytz.timezone("America/Sao_Paulo"))
+semana_atual = hoje.isocalendar().week
+
+df_semana = df_usuario[df_usuario["semana"] == semana_atual]
+
+vendas_na_semana = df_semana["vendas"].sum() if not df_semana.empty else 0
+
+week_row = df_semana.iloc[0] if not df_semana.empty else None
+
+semana_inicio = week_row.get("semana_inicio", "-") if week_row is not None else "-"
+semana_fim = week_row.get("semana_fim", "-") if week_row is not None else "-"
+
+# Cards KPI
+st.markdown(
+    f"""
+<div style="display:flex;gap:20px;">
+    <div class='card' style='flex:1;'>
+        <h4>💵 Vendido na semana</h4>
+        <p style='font-size:22px;margin:0;'>R$ {vendas_na_semana:,.2f}</p>
+        <p class='muted'>Período: {semana_inicio} → {semana_fim}</p>
+    </div>
+
+    <div class='card' style='flex:1;'>
+        <h4>📋 Registros</h4>
+        <p style='font-size:22px;margin:0;'>{len(df_usuario)}</p>
+    </div>
+</div>
+""",
+    unsafe_allow_html=True
+)
+
+
+# ────────────────────────────────────────────────────────────────
+# FORMULÁRIO DO DIÁRIO DE BORDO
+# ────────────────────────────────────────────────────────────────
+
+st.subheader("✏️ Novo registro")
+
+with st.form("novo_diario"):
+    data = st.date_input("Data da visita")
+    cliente = st.text_input("Cliente")
+    venda = st.number_input("Valor da venda (R$)", format="%.2f")
+    observacao = st.text_area("Observação")
+
+    salvar = st.form_submit_button("Salvar")
+
+if salvar:
+    nova_linha = pd.DataFrame([{
+        "email": st.session_state["email"],
+        "nome": st.session_state["nome"],
+        "data": data,
+        "cliente": cliente,
+        "vendas": venda,
+        "observacao": observacao,
+        "semana": data.isocalendar()[1]
+    }])
+
+    df_diario = pd.concat([df_diario, nova_linha], ignore_index=True)
+    df_diario.to_excel(os.path.join("dados", "diario_bordo.xlsx"), index=False)
+
+    st.success("✅ Registro salvo com sucesso!")
     st.experimental_rerun()
 
-st.title("📘 Diário de Bordo - Resumo Semanal")
+# ────────────────────────────────────────────────────────────────
+# LISTAGEM DE REGISTROS DA SEMANA
+# ────────────────────────────────────────────────────────────────
 
-# ======= LEITURA DE DADOS =======
-try:
-    dados = pd.read_excel("dados/diario_bordo.xlsx")
-except FileNotFoundError:
-    st.error("Arquivo 'diario_bordo.xlsx' não encontrado na pasta /dados")
-    st.stop()
+st.subheader("🗂️ Registros da semana")
 
-try:
-    metas = pd.read_excel("dados/metas_colecao.xlsx")
-except FileNotFoundError:
-    st.error("Arquivo 'metas_colecao.xlsx' não encontrado na pasta /dados")
-    st.stop()
-
-# ======= FILTROS =======
-usuario = st.session_state["usuario"]
-dados_usuario = dados[dados["usuario"] == usuario]
-
-if dados_usuario.empty:
-    st.warning("Nenhum registro encontrado para este usuário.")
-    st.stop()
-
-# Selecionar semana
-semanas = sorted(dados_usuario["semana"].unique(), reverse=True)
-semana_selecionada = st.selectbox("Selecione a semana:", semanas)
-
-week_row = dados_usuario[dados_usuario["semana"] == semana_selecionada]
-
-# ======= VARIÁVEIS CORRIGIDAS =======
-semana_inicio = (
-    week_row["semana_inicio"].iloc[0]
-    if "semana_inicio" in week_row.columns and not week_row.empty
-    else "-"
-)
-semana_fim = (
-    week_row["semana_fim"].iloc[0]
-    if "semana_fim" in week_row.columns and not week_row.empty
-    else "-"
-)
-
-# ======= CÁLCULOS =======
-vendas_na_semana = week_row["vendas"].sum()
-meta_semana = metas.loc[metas["usuario"] == usuario, "meta_semanal"].sum()
-progresso = (vendas_na_semana / meta_semana * 100) if meta_semana > 0 else 0
-
-# ======= EXIBIÇÃO =======
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown(
-        f"""
-        <div class='card' style='flex:1;'>
-            <h4>💵 Vendido esta semana</h4>
-            <p style='font-size:22px;margin:0;'>R$ {vendas_na_semana:,.2f}</p>
-            <p class='muted'>Período: {semana_inicio} → {semana_fim}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col2:
-    st.markdown(
-        f"""
-        <div class='card' style='flex:1;'>
-            <h4>🎯 Meta semanal</h4>
-            <p style='font-size:22px;margin:0;'>R$ {meta_semana:,.2f}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col3:
-    st.markdown(
-        f"""
-        <div class='card' style='flex:1;'>
-            <h4>📊 Progresso</h4>
-            <p style='font-size:22px;margin:0;'>{progresso:.1f}%</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-st.progress(min(progresso / 100, 1.0))
-
-st.markdown("---")
-st.subheader("📈 Detalhes da Semana")
-st.dataframe(week_row)
-
-# ======= CSS =======
-st.markdown(
-    """
-    <style>
-    .card {
-        background: #f9f9f9;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        text-align: center;
-        margin-bottom: 10px;
-    }
-    .muted {
-        color: #666;
-        font-size: 13px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.dataframe(df_semana)
 
 
