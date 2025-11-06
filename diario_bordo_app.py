@@ -3,6 +3,14 @@ import pandas as pd
 from datetime import datetime
 from streamlit_js_eval import streamlit_js_eval
 
+# Inicializa session_state
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "login"
+
+if "representante" not in st.session_state:
+    st.session_state.representante = None
+
+
 # ================================
 # CONFIGURAÇÕES DO APP
 # ================================
@@ -250,3 +258,4 @@ elif pagina == "Metas":
 
 # BOTÃO DE LOGOUT
 st.sidebar.button("Logout", on_click=lambda: [st.session_state.clear(), st.rerun()])
+
