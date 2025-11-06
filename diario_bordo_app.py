@@ -74,11 +74,11 @@ if not st.session_state.logado:
     senha = st.text_input("Senha", type="password")
 
     if st.button("Entrar"):
-        usuario = email.strip()
+        usuario = usuario.strip()
         senha = senha.strip()
 
         user_row = usuarios_df[
-            (usuarios_df["usuario"] == usuario) &
+            (usuarios_df["representante"] == usuario) &
             (usuarios_df["senha"] == senha)
         ]
 
@@ -165,4 +165,5 @@ with col5:
 # Tabela de vendas
 st.subheader("📄 Últimas vendas")
 st.dataframe(vendas_rep, use_container_width=True)
+
 
