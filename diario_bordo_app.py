@@ -1,135 +1,150 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+import datetime
 
-# ==================== CONFIGURAÇÕES GERAIS ====================
+# ---------------------------
+# CONFIGURAÇÃO DO APP
+# ---------------------------
 st.set_page_config(page_title="Diário de Bordo", layout="wide")
 
-# ==================== FUNÇÕES AUXILIARES ====================
-def carregar_dados():
-    try:
-        usuarios = pd.read_excel("dados/usuarios.xlsx")
-    except Exception:
-        st.error("❌ Erro ao carregar arquivo: usuarios.xlsx")
-        return None, None, None
+# ---------------------------
+# FUNÇÃO PARA CARREGAR PLANILHAS
+# ---------------------------
+@st.cache_data
+def carregar_planilhas():
+    usuarios_df = pd.read_excel("dados/usuarios.xlsx")
+    vendas_df = pd.read_excel("dados/vendas.xlsx")
+    metas_df = pd.read_excel("dados/metas.xlsx")
+    metas_semanais_df = pd.read_excel("dados/meta_semanal.xlsx")
+    return usuarios_df, vendas_df, metas_df, metas_semanais_df
 
-    try:
-        metas_colecao = pd.read_excel("dados/metas_colecao.xlsx")
-    except Exception:
-        st.error("❌ Erro ao carregar arquivo: metas_colecao.xlsx")
-        return None, None, None
+usuarios_df, vendas_df, metas_df, metas_semanais_df = carregar_planilhas()
 
-    try:
-        metas_semana = pd.read_excel("dados/meta_semanal.xlsx")
-    except Exception:
-        st.error("❌ Erro ao carregar arquivo: meta_semanal.xlsx")
-        return None, None, None
+# ---------------------------
+# INICIALIZA SESSION
+# ---------------------------
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
 
-    return usuarios, metas_colecao, metas_semana
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "Dashboard"
 
-# ==================== LOGIN ====================
-if "autenticado" not in st.session_state:
-    st.session_state.autenticado = False
+# ======================================================
+# 🔐 TELA DE LOGIN
+# ======================================================
+if not st.session_state["logado"]:
 
-if not st.session_state.autenticado:
-    st.title("🔐 Login")
+    st.title("🔐 Acesso ao Diário de Bordo")
 
-email_input = st.text_input("Email").strip()
-senha_input = st.text_input("Senha", type="password").strip()
+    email_input = st.text_input("Email").strip()
+    senha_input = st.text_input("Senha", type="password").strip()
 
-# ✅ Debug temporário
-st.write("🔍 DEBUG - usuários carregados:")
-st.dataframe(usuarios_df)
+    # 🔍 DEBUG TEMPORÁRIO PARA DESCOBRIR O ERRO
+    st.write("### 🔍 DEBUG (remover depois)")
+    st.write("Usuários carregados da planilha:")
+    st.dataframe(usuarios_df)
+    st.write("Email digitado:", email_input)
+    st.write("Senha digitada:", senha_input)
 
-st.write("🔍 DEBUG - email digitado:", email_input)
-st.write("🔍 DEBUG - senha digitada:", senha_input)
+    # Normalização para evitar erro de espaços e maiúsculas
+    usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip().str.lower()
+    usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
 
-# Normalização para evitar erro de espaços e caixa alta
-usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip().str.lower()
-usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
+    email_normalizado = email_input.lower()
 
-email_normalizado = email_input.lower()
+    usuario = usuarios_df[
+        (usuarios_df["email"] == email_normalizado) &
+        (usuarios_df["senha"] == senha_input)
+    ]
 
-usuario = usuarios_df[
-    (usuarios_df["email"] == email_normalizado) &
-    (usuarios_df["senha"] == senha_input)
-]
-
-    if botao:
-        usuarios, _, _ = carregar_dados()
-
-        if usuarios is None:
-            st.stop()
-
-        usuario = usuarios[(usuarios["email"] == email) & (usuarios["senha"] == senha)]
-
+    if st.button("Entrar"):
         if not usuario.empty:
-            st.session_state.autenticado = True
-            st.session_state.nome = usuario.iloc[0]["nome"]
+            st.session_state["logado"] = True
+            st.session_state["usuario"] = usuario.iloc[0]["email"]
+            st.session_state["representante"] = usuario.iloc[0]["representante"]
             st.experimental_rerun()
         else:
-            st.error("❌ Usuário ou senha incorretos!")
+            st.error("❌ Usuário ou senha incorretos. Confira a planilha `usuarios.xlsx`.")
 
-    st.stop()
+    st.stop()  # impede o restante do app de carregar
 
-# ==================== PÁGINA PRINCIPAL ====================
-st.sidebar.title(f"👋 Olá, {st.session_state['nome']}")
+# ======================================================
+# ✅ ÁREA LOGADA
+# ======================================================
 
-usuarios, metas_colecao, metas_semana = carregar_dados()
-if usuarios is None:
-    st.stop()
+st.sidebar.title(f"👋 Olá, {st.session_state['representante']}")
+paginas = ["Dashboard", "Clientes", "Ranking", "Dossiê Cliente"]
+pagina = st.sidebar.radio("Navegação", paginas)
 
-st.title("📊 Diário de Bordo - Dashboard do Representante")
+# ---------------------------
+# CARREGAMENTOS
+# ---------------------------
+representante = st.session_state['representante']
+vendas_rep = vendas_df[vendas_df["representante"] == representante]
 
-representante = st.session_state["nome"]
-colecao = st.selectbox("Selecione a coleção", metas_colecao["colecao"].unique())
+# ---------------------------
+# DASHBOARD
+# ---------------------------
+if pagina == "Dashboard":
+    st.title("📊 Dashboard de Vendas")
 
-meta_rep = metas_colecao[(metas_colecao["representante"] == representante) & (metas_colecao["colecao"] == colecao)]
+    meta = metas_df[metas_df["representante"] == representante]
 
-if meta_rep.empty:
-    st.warning("⚠️ Nenhuma meta encontrada para este representante nesta coleção.")
-    st.stop()
+    if not meta.empty:
+        meta_valor = float(meta.iloc[0]["meta_vendas"])
+        meta_clientes = int(meta.iloc[0]["meta_clientes"])
+    else:
+        meta_valor = 0
+        meta_clientes = 0
 
-meta_vendas = float(meta_rep.iloc[0]["meta_vendas"])
-meta_clientes = float(meta_rep.iloc[0]["meta_clientes"])
-ticket_medio = meta_vendas / meta_clientes if meta_clientes > 0 else 0
+    total_vendido = vendas_rep["valor_vendido"].sum()
+    porcentagem_meta = (total_vendido / meta_valor) * 100 if meta_valor > 0 else 0
 
-# pegar semana atual
-hoje = date.today()
-semana = metas_semana[metas_semana["data_inicio"] <= hoje]
-semana = semana[semana["data_fim"] >= hoje].reset_index()
+    # Barra de progresso
+    st.subheader(f"🏁 Você atingiu **{porcentagem_meta:.1f}%** da meta da coleção")
+    st.progress(min(porcentagem_meta / 100, 1.0))
 
-if semana.empty:
-    st.error("❌ Não encontrou semana no arquivo meta_semanal.xlsx para a data de hoje")
-    st.stop()
+    # Cálculo semanal
+    hoje = datetime.date.today()
+    semana_atual = metas_semanais_df[
+        (metas_semanais_df["representante"] == representante)
+        & (pd.to_datetime(metas_semanais_df["semana_inicio"]).dt.date <= hoje)
+        & (pd.to_datetime(metas_semanais_df["semana_fim"]).dt.date >= hoje)
+    ]
 
-semana_atual = float(semana.iloc[0]["percentual_meta"])
-meta_semana_vendas = meta_vendas * semana_atual
-clientes_semana = meta_semana_vendas / ticket_medio if ticket_medio > 0 else 0
+    if not semana_atual.empty:
+        semana_meta_valor = semana_atual.iloc[0]["meta_semanal"]
+        ticket_medio_planejado = meta_valor / meta_clientes if meta_clientes > 0 else 0
+        clientes_necessarios = semana_meta_valor / ticket_medio_planejado if ticket_medio_planejado > 0 else 0
 
-# ==================== CARDS ====================
-st.markdown(f"""
-<div style='display:flex; gap:16px;'>
-    <div style='flex:1; background:#f4f4f4; padding:20px; border-radius:10px;'>
-        <h3>🎯 % da Meta da Coleção</h3>
-        <p style='font-size:28px; margin:0;'><b>{semana_atual*100:.1f}%</b></p>
-    </div>
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Meta de vendas da semana", f"R$ {semana_meta_valor:,.2f}")
+        col2.metric("Ticket médio previsto", f"R$ {ticket_medio_planejado:,.2f}")
+        col3.metric("Clientes necessários na semana", f"{clientes_necessarios:.1f}")
+    else:
+        st.warning("Nenhuma meta semanal configurada para esta data.")
 
-    <div style='flex:1; background:#f4f4f4; padding:20px; border-radius:10px;'>
-        <h3>📈 Meta de vendas da semana</h3>
-        <p style='font-size:28px; margin:0;'>R$ {meta_semana_vendas:,.2f}</p>
-    </div>
+# ---------------------------
+# CLIENTES
+# ---------------------------
+elif pagina == "Clientes":
+    st.title("👥 Clientes")
+    st.dataframe(vendas_rep[["cliente", "cidade", "valor_vendido"]].sort_values("cliente"))
 
-    <div style='flex:1; background:#f4f4f4; padding:20px; border-radius:10px;'>
-        <h3>👥 Clientes a vender na semana</h3>
-        <p style='font-size:28px; margin:0;'>{clientes_semana:.0f}</p>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ---------------------------
+# RANKING DE VENDAS
+# ---------------------------
+elif pagina == "Ranking":
+    st.title("🏆 Ranking de Clientes")
 
+    ranking = vendas_rep.groupby("cliente")["valor_vendido"].sum().reset_index()
+    ranking = ranking.sort_values("valor_vendido", ascending=False)
+    st.dataframe(ranking)
 
-
-
-
-
-
+# ---------------------------
+# DOSSIÊ CLIENTE
+# ---------------------------
+elif pagina == "Dossiê Cliente":
+    st.title("📂 Dossiê do Cliente")
+    cliente_sel = st.selectbox("Selecione o cliente", vendas_rep["cliente"].unique())
+    st.dataframe(vendas_rep[vendas_rep["cliente"] == cliente_sel])
