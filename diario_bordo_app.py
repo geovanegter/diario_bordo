@@ -82,6 +82,15 @@ button[kind="primary"]:hover {
 </style>
 """, unsafe_allow_html=True)
 
+# -----------------------------------------
+# CONTROLE DE ESTADO
+# -----------------------------------------
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if "user" not in st.session_state:
+    st.session_state["user"] = None
+
 
 # ---------------------------------------------------------
 # FUNÇÕES
@@ -289,3 +298,4 @@ if st.session_state.logado:
     if st.sidebar.button("🚪 Logout"):
         st.session_state.clear()
         st.rerun()
+
