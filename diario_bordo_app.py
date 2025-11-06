@@ -61,7 +61,7 @@ def obter_localizacao():
 # ------------------------------------------------------------
 # LOGIN
 # ------------------------------------------------------------
-usuarios_df = pd.read_excel("dados/usuarios.xlsx")  # colunas: usuario, senha, nome
+usuarios_df = pd.read_excel("dados/usuarios.xlsx")  # colunas: email, senha, representante
 
 if "logado" not in st.session_state:
     st.session_state.logado = False
@@ -74,7 +74,7 @@ if not st.session_state.logado:
     senha = st.text_input("Senha", type="password")
 
     if st.button("Entrar"):
-        usuario = usuario.strip()
+        usuario = email.strip()
         senha = senha.strip()
 
         user_row = usuarios_df[
@@ -165,3 +165,4 @@ with col5:
 # Tabela de vendas
 st.subheader("📄 Últimas vendas")
 st.dataframe(vendas_rep, use_container_width=True)
+
