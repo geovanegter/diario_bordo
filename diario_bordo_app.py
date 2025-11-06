@@ -26,6 +26,7 @@ def carregar_dados():
         return None, None, None
 
     return usuarios, metas_colecao, metas_semana
+    
 st.write("Usuários carregados:", usuarios_df)
 
 # ==================== LOGIN ====================
@@ -110,5 +111,6 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 
