@@ -179,7 +179,7 @@ if st.session_state.pagina_atual == "Dashboard":
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("💰 Total vendido", f"R$ {total_vendido:,.2f}")
-    col2.metric("🎯 Meta do mês", f"R$ {meta_vendas:,.2f}")
+    col2.metric("🎯 Meta do mês", f"R$ {meta_valor:,.2f}")
     col3.metric("📅 Vender por dia", f"R$ {vender_por_dia:,.2f}")
     col4.metric("👥 Clientes por dia", f"{clientes_por_dia:.1f}")
 
@@ -217,6 +217,7 @@ elif st.session_state.pagina_atual == "Plano de Ação":
 elif st.session_state.pagina_atual == "Metas":
     st.markdown("### 🎯 Metas e Coleções")
     st.dataframe(metas_df[metas_df["representante"] == representante])
+
 
 
 
