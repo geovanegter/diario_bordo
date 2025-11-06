@@ -33,7 +33,7 @@ def carregar_planilha(nome_arquivo):
 
 # Carregar dados
 df_usuarios = carregar_planilha("usuarios.xlsx")
-df_diario = carregar_planilha("diario_bordo.xlsx")
+df_diario = carregar_planilha("vendas.xlsx")
 df_metas = carregar_planilha("metas_colecao.xlsx")
 
 # ────────────────────────────────────────────────────────────────
@@ -155,5 +155,6 @@ if salvar:
 st.subheader("🗂️ Registros da semana")
 
 st.dataframe(df_semana)
+
 
 
