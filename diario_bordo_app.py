@@ -1,43 +1,103 @@
+# ---------- BLOCO SEGURO DE AUTENTICAÇÃO ----------
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from pathlib import Path
 
-# Configuração da página
-st.set_page_config(page_title="📘 Diário de Bordo", layout="wide")
+# inicializa session_state básico (evita AttributeError)
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "Dashboard"
 
-# ======= FUNÇÃO DE LOGIN =======
-def autenticar_usuario(usuario, senha):
+DATA_DIR = Path("dados")
+USERS_PATH = DATA_DIR / "usuarios.xlsx"
+
+# Função para carregar e mostrar colunas para debug
+def carregar_usuarios_debug(path):
+    if not path.exists():
+        st.error(f"Arquivo não encontrado: {path}")
+        return pd.DataFrame()
     try:
-        usuarios = pd.read_excel("dados/usuarios.xlsx")
-        dados_usuario = usuarios.loc[usuarios["representante"] == usuario]
-        if not dados_usuario.empty and dados_usuario.iloc[0]["senha"] == senha:
-            return dados_usuario.iloc[0]["nome"]
-        return None
+        df = pd.read_excel(path)
+        # normaliza nomes de coluna: strip
+        df.columns = df.columns.str.strip()
+        return df
     except Exception as e:
-        st.error(f"Erro ao autenticar: {e}")
+        st.error(f"Erro ao ler {path.name}: {e}")
+        return pd.DataFrame()
+
+# Carrega usuarios (uma vez)
+usuarios_df = carregar_usuarios_debug(USERS_PATH)
+
+# Mostra colunas (remove comentário se quiser checar)
+# st.write("Colunas em usuarios.xlsx:", usuarios_df.columns.tolist())
+
+def autenticar(email, senha):
+    """Retorna dict do usuário se encontrado, senão None."""
+    if usuarios_df.empty:
         return None
 
-# ======= LOGIN =======
-if "autenticado" not in st.session_state:
-    st.session_state["autenticado"] = False
+    # normaliza colunas com segurança
+    cols = [c.lower().strip() for c in usuarios_df.columns]
+    # procura coluna email e senha nas variações comuns
+    email_col = next((c for c in usuarios_df.columns if c.lower().strip() in ("email","e-mail","usuario","user","login")), None)
+    senha_col = next((c for c in usuarios_df.columns if c.lower().strip() in ("senha","password","pass")), None)
+    rep_col = next((c for c in usuarios_df.columns if c.lower().strip() in ("representante","rep","nome")), None)
 
-if not st.session_state["autenticado"]:
-    st.title("🔐 Acesso ao Diário de Bordo")
+    if email_col is None or senha_col is None:
+        st.error("Colunas de autenticação não encontradas em usuarios.xlsx. Esperado: 'email' e 'senha'.")
+        return None
 
-    usuario = st.text_input("Usuário")
-    senha = st.text_input("Senha", type="password")
+    # compara de forma segura
+    try:
+        df = usuarios_df.copy()
+        df[email_col] = df[email_col].astype(str).str.strip()
+        df[senha_col] = df[senha_col].astype(str).str.strip()
+    except Exception:
+        df = usuarios_df.copy()
 
-    if st.button("Entrar"):
-        nome = autenticar_usuario(usuario, senha)
-        if nome:
-            st.session_state["autenticado"] = True
-            st.session_state["usuario"] = usuario
-            st.session_state["nome"] = nome
-            st.success(f"Bem-vindo(a), {nome} 👋")
-            st.experimental_rerun()
+    filtro = (df[email_col].str.lower() == str(email).strip().lower()) & (df[senha_col] == str(senha).strip())
+    matched = df[filtro]
+
+    if len(matched) == 1:
+        row = matched.iloc[0].to_dict()
+        # garante campo representante
+        if rep_col:
+            row_rep = matched.iloc[0].get(rep_col)
+            row["representante"] = row_rep if pd.notna(row_rep) else row.get(email_col)
         else:
-            st.error("Usuário ou senha incorretos.")
+            row["representante"] = row.get(email_col)
+        # padroniza keys para o app
+        return {
+            "email": row.get(email_col),
+            "representante": row.get("representante"),
+            **{k: row.get(k) for k in usuarios_df.columns if k not in (email_col, senha_col)}
+        }
+    return None
+
+# Tela de login segura (substitui blocos anteriores)
+if not st.session_state.logado:
+    st.markdown("<h2 style='text-align:center;'>🔐 Diário de Bordo — Login</h2>", unsafe_allow_html=True)
+    with st.form("login_form"):
+        email_input = st.text_input("E-mail")
+        senha_input = st.text_input("Senha", type="password")
+        submit = st.form_submit_button("Entrar")
+
+    if submit:
+        user = autenticar(email_input, senha_input)
+        if user:
+            st.session_state.logado = True
+            st.session_state.user = user
+            # Define pagina padrão
+            st.session_state.pagina = "Dashboard"
+            st.rerun()  # NOTA: usar st.rerun(), não experimental_rerun
+        else:
+            st.error("E-mail ou senha inválidos. Verifique planilha usuarios.xlsx e tente novamente.")
     st.stop()
+# ---------- FIM BLOCO AUTENTICAÇÃO ----------
+
 
 # ======= SE CHEGOU AQUI, ESTÁ LOGADO =======
 st.sidebar.title(f"👋 Olá, {st.session_state['nome']}")
@@ -154,4 +214,5 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
