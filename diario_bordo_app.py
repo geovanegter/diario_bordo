@@ -6,10 +6,10 @@ st.set_page_config(page_title="Diário de Bordo – Vendas", layout="wide")
 
 @st.cache_data
 def carregar_planilhas():
-    usuarios_df = pd.read_excel("dados/usuarios.xlsx")
-    vendas_df = pd.read_excel("dados/vendas.xlsx")
-    metas_df = pd.read_excel("dados/metas_colecao.xlsx")
-    metas_semanais_df = pd.read_excel("dados/meta_semanal.xlsx")
+    usuarios_df = pd.read_excel("dados/usuarios.xlsx")  # email, senha, nome
+    vendas_df = pd.read_excel("dados/vendas.xlsx")      # precisa ter coluna "nome" ou "representante"
+    metas_df = pd.read_excel("dados/metas_colecao.xlsx")  # meta mensal por coleção
+    metas_semanais_df = pd.read_excel("dados/meta_semanal.xlsx")  # percentual da meta por semana
     return usuarios_df, vendas_df, metas_df, metas_semanais_df
 
 
@@ -20,13 +20,16 @@ usuarios_df, vendas_df, metas_df, metas_semanais_df = carregar_planilhas()
 # --------------------------
 st.title("🔐 Login – Diário de Bordo")
 
-usuario = st.text_input("Usuário:")
+email = st.text_input("E-mail:")
 senha = st.text_input("Senha:", type="password")
 btn_login = st.button("Entrar")
 
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
+
 if btn_login:
     usuario_validado = usuarios_df[
-        (usuarios_df["email"] == usuario) &
+        (usuarios_df["email"] == email) &
         (usuarios_df["senha"] == senha)
     ]
 
@@ -34,44 +37,38 @@ if btn_login:
         st.error("❌ Usuário ou senha incorretos.")
         st.stop()
 
-    representante = usuario_validado.iloc[0]["representante"]
     st.session_state["logado"] = True
-    st.session_state["representante"] = representante
+    st.session_state["nome"] = usuario_validado.iloc[0]["nome"]
     st.rerun()
 
-if "logado" not in st.session_state:
+if not st.session_state["logado"]:
     st.stop()
 
 # --------------------------
 # PÁGINA PRINCIPAL
 # --------------------------
-representante = st.session_state["representante"]
-st.subheader(f"👤 Bem-vindo, {representante}")
+nome = st.session_state["nome"]
+st.subheader(f"👤 Bem-vindo, {nome}")
 
-# Filtra vendas do representante
-vendas_rep = vendas_df[vendas_df["representante"] == representante]
+# Certifica que vendas tem a coluna correta para filtragem
+if "representante" in vendas_df.columns:
+    vendas_rep = vendas_df[vendas_df["representante"] == nome]
+else:
+    vendas_rep = vendas_df[vendas_df["nome"] == nome]
 
 colecao = st.selectbox("Selecione a coleção:", sorted(vendas_rep["colecao"].unique()))
-data_filtro = st.date_input("Selecione uma data referência para meta semanal:")
+data_filtro = st.date_input("Selecione uma data de referência para calcular a meta da semana:")
 
 # --------------------------
-# META MENSAL (tabela metas.xlsx)
+# META MENSAL (metas_colecao.xlsx)
 # --------------------------
-meta_mensal = metas_df[
-    (metas_df["representante"] == representante) &
-    (metas_df["colecao"] == colecao)
-]
+meta_mensal = metas_df[metas_df["colecao"] == colecao]
 
-if not meta_mensal.empty:
-    meta_mensal_valor = meta_mensal.iloc[0]["meta"]
-else:
-    meta_mensal_valor = 0
-
-# Soma das vendas do representante na coleção
+meta_mensal_valor = meta_mensal["meta"].iloc[0] if not meta_mensal.empty else 0
 total_vendido = vendas_rep[vendas_rep["colecao"] == colecao]["valor"].sum()
 
 # --------------------------
-# META SEMANAL (geral por coleção)
+# META SEMANAL (meta_semanal.xlsx)
 # --------------------------
 meta_semana = metas_semanais_df[
     (metas_semanais_df["colecao"] == colecao) &
@@ -81,13 +78,13 @@ meta_semana = metas_semanais_df[
 
 if not meta_semana.empty:
     percentual_semana = meta_semana.iloc[0]["percentual_da_meta"]
-    meta_semana_valor = (meta_mensal_valor * percentual_semana)
+    meta_semana_valor = meta_mensal_valor * percentual_semana
 else:
     percentual_semana = 0
     meta_semana_valor = 0
 
 # --------------------------
-# EXIBIÇÃO DAS INFORMAÇÕES
+# EXIBIÇÃO
 # --------------------------
 col1, col2, col3 = st.columns(3)
 col1.metric("Meta Mensal", f"R$ {meta_mensal_valor:,.2f}".replace(",", "."))
@@ -96,5 +93,6 @@ col3.metric("Vendido", f"R$ {total_vendido:,.2f}".replace(",", "."))
 
 st.write("📊 **Detalhamento das vendas**")
 st.dataframe(vendas_rep[vendas_rep["colecao"] == colecao])
+
 
 
