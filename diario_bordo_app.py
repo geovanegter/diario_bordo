@@ -366,7 +366,17 @@ if pagina == "Dashboard":
     # show weekly info block
     st.markdown("<div style='display:flex;gap:12px;'>", unsafe_allow_html=True)
     st.markdown(f"<div class='card' style='flex:1;'><h4>🎯 Meta da semana</h4><p style='font-size:22px;margin:0;'>R$ {meta_semana_val:,.2f}</p><p class='muted'>Meta semanal definida pela tabela</p></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='card' style='flex:1;'><h4>💵 Vendido esta semana</h4><p style='font-size:22px;margin:0;'>R$ {vendas_na_semana:,.2f}</p><p class='muted'>Período: {week_row.get('semana_inicio')} → {week_row.get('semana_fim') if week_row is not None else '-'}</p></div>", unsafe_allow_html=True)
+    st.markdown(
+    f"""
+    <div class='card' style='flex:1;'>
+        <h4>💵 Vendido esta semana</h4>
+        <p style='font-size:22px;margin:0;'>R$ {vendas_na_semana:,.2f}</p>
+        <p class='muted'>Período: {semana_inicio} → {semana_fim}</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
     st.markdown(f"<div class='card' style='flex:1;'><h4>🔥 Falta vender (esta semana)</h4><p style='font-size:22px;margin:0;'>R$ {falta_semana:,.2f}</p></div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -435,5 +445,6 @@ elif pagina == "Dossiê Cliente":
 
 else:
     st.info("Selecione uma página no menu lateral.")
+
 
 
