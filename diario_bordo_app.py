@@ -26,7 +26,7 @@ btn_login = st.button("Entrar")
 
 if btn_login:
     usuario_validado = usuarios_df[
-        (usuarios_df["usuario"] == usuario) &
+        (usuarios_df["email"] == usuario) &
         (usuarios_df["senha"] == senha)
     ]
 
@@ -96,4 +96,5 @@ col3.metric("Vendido", f"R$ {total_vendido:,.2f}".replace(",", "."))
 
 st.write("📊 **Detalhamento das vendas**")
 st.dataframe(vendas_rep[vendas_rep["colecao"] == colecao])
+
 
