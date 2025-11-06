@@ -163,14 +163,14 @@ if st.session_state.pagina_atual == "Dashboard":
     total_clientes = vendas_rep["cliente"].nunique()
 
     meta_row = metas_df[metas_df["representante"] == representante]
-    meta_valor = meta_row["meta_valor"].sum() if not meta_row.empty else 0
+    meta_valor = meta_row["meta_vendas"].sum() if not meta_row.empty else 0
     meta_clientes = meta_row["meta_clientes"].sum() if not meta_row.empty else 0
 
     hoje = datetime.now().day
     dias_no_mes = 30
     dias_restantes = dias_no_mes - hoje
 
-    falta_vender = max(meta_valor - total_vendido, 0)
+    falta_vender = max(meta_vendas - total_vendido, 0)
     vender_por_dia = falta_vender / dias_restantes if dias_restantes > 0 else falta_vender
 
     falta_clientes = max(meta_clientes - total_clientes, 0)
@@ -179,7 +179,7 @@ if st.session_state.pagina_atual == "Dashboard":
     col1, col2, col3, col4 = st.columns(4)
 
     col1.metric("💰 Total vendido", f"R$ {total_vendido:,.2f}")
-    col2.metric("🎯 Meta do mês", f"R$ {meta_valor:,.2f}")
+    col2.metric("🎯 Meta do mês", f"R$ {meta_vendas:,.2f}")
     col3.metric("📅 Vender por dia", f"R$ {vender_por_dia:,.2f}")
     col4.metric("👥 Clientes por dia", f"{clientes_por_dia:.1f}")
 
@@ -217,6 +217,7 @@ elif st.session_state.pagina_atual == "Plano de Ação":
 elif st.session_state.pagina_atual == "Metas":
     st.markdown("### 🎯 Metas e Coleções")
     st.dataframe(metas_df[metas_df["representante"] == representante])
+
 
 
 
