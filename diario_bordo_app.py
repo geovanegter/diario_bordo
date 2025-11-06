@@ -62,7 +62,7 @@ if not st.session_state["logado"]:
             st.session_state["logado"] = True
             st.session_state["usuario"] = usuario.iloc[0]["email"]
             st.session_state["representante"] = usuario.iloc[0]["representante"]
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("❌ Usuário ou senha incorretos. Confira a planilha `usuarios.xlsx`.")
 
@@ -148,4 +148,5 @@ elif pagina == "Dossiê Cliente":
     st.title("📂 Dossiê do Cliente")
     cliente_sel = st.selectbox("Selecione o cliente", vendas_rep["cliente"].unique())
     st.dataframe(vendas_rep[vendas_rep["cliente"] == cliente_sel])
+
 
