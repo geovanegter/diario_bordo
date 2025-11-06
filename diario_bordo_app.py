@@ -84,14 +84,18 @@ if not st.session_state.authenticated:
     st.markdown("<p style='text-align:center;'>Acesse com seu usuário e senha</p>", unsafe_allow_html=True)
 
     with st.form("login", clear_on_submit=False):
-        usuario = st.text_input("Usuário:")
+        email = st.text_input("E-mail:")
         senha = st.text_input("Senha:", type="password")
         logar = st.form_submit_button("Entrar")
 
     if logar:
+
+        # Normaliza colunas (remove espaços e garante lowercase)
+        usuarios_df.columns = usuarios_df.columns.str.strip().str.lower()
+
         user_row = usuarios_df[
-            (usuarios_df["usuario"] == usuario) &
-            (usuarios_df["senha"] == senha)
+            (usuarios_df["email"].str.lower() == email.lower()) &
+            (usuarios_df["senha"].astype(str) == senha)
         ]
 
         if not user_row.empty:
@@ -102,6 +106,7 @@ if not st.session_state.authenticated:
             st.error("❌ Usuário ou senha inválidos")
 
     st.stop()
+
 
 # -----------------------------------------
 # USUÁRIO LOGADO
@@ -212,6 +217,7 @@ elif st.session_state.pagina_atual == "Plano de Ação":
 elif st.session_state.pagina_atual == "Metas":
     st.markdown("### 🎯 Metas e Coleções")
     st.dataframe(metas_df[metas_df["representante"] == representante])
+
 
 
 
