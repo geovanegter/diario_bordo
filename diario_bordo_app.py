@@ -14,7 +14,7 @@ st.set_page_config(page_title="Diário de Bordo", layout="wide")
 def carregar_planilhas():
     usuarios_df = pd.read_excel("dados/usuarios.xlsx")
     vendas_df = pd.read_excel("dados/vendas.xlsx")
-    metas_df = pd.read_excel("dados/metas.xlsx")
+    metas_df = pd.read_excel("dados/metas_colecao.xlsx")
     metas_semanais_df = pd.read_excel("dados/meta_semanal.xlsx")
     return usuarios_df, vendas_df, metas_df, metas_semanais_df
 
@@ -148,3 +148,4 @@ elif pagina == "Dossiê Cliente":
     st.title("📂 Dossiê do Cliente")
     cliente_sel = st.selectbox("Selecione o cliente", vendas_rep["cliente"].unique())
     st.dataframe(vendas_rep[vendas_rep["cliente"] == cliente_sel])
+
