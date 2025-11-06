@@ -55,8 +55,6 @@ usuario = usuarios_df[
     (usuarios_df["senha"] == senha_input)
 ]
 
-    botao = st.button("Entrar")
-
     if botao:
         usuarios, _, _ = carregar_dados()
 
@@ -128,6 +126,7 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
