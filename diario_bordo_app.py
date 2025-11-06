@@ -1,152 +1,98 @@
 import streamlit as st
 import pandas as pd
-import datetime
+from datetime import datetime
 
-# ---------------------------
-# CONFIGURAÇÃO DO APP
-# ---------------------------
-st.set_page_config(page_title="Diário de Bordo", layout="wide")
+st.set_page_config(page_title="Diário de Bordo – Vendas", layout="wide")
 
-# ---------------------------
-# FUNÇÃO PARA CARREGAR PLANILHAS
-# ---------------------------
 @st.cache_data
 def carregar_planilhas():
     usuarios_df = pd.read_excel("dados/usuarios.xlsx")
     vendas_df = pd.read_excel("dados/vendas.xlsx")
-    metas_df = pd.read_excel("dados/metas_colecao.xlsx")
+    metas_df = pd.read_excel("dados/metas.xlsx")
     metas_semanais_df = pd.read_excel("dados/meta_semanal.xlsx")
     return usuarios_df, vendas_df, metas_df, metas_semanais_df
 
+
 usuarios_df, vendas_df, metas_df, metas_semanais_df = carregar_planilhas()
 
-# ---------------------------
-# INICIALIZA SESSION
-# ---------------------------
-if "logado" not in st.session_state:
-    st.session_state["logado"] = False
+# --------------------------
+# LOGIN
+# --------------------------
+st.title("🔐 Login – Diário de Bordo")
 
-if "pagina" not in st.session_state:
-    st.session_state["pagina"] = "Dashboard"
+usuario = st.text_input("Usuário:")
+senha = st.text_input("Senha:", type="password")
+btn_login = st.button("Entrar")
 
-# ======================================================
-# 🔐 TELA DE LOGIN
-# ======================================================
-if not st.session_state["logado"]:
-
-    st.title("🔐 Acesso ao Diário de Bordo")
-
-    email_input = st.text_input("Email").strip()
-    senha_input = st.text_input("Senha", type="password").strip()
-
-    # 🔍 DEBUG TEMPORÁRIO PARA DESCOBRIR O ERRO
-    st.write("### 🔍 DEBUG (remover depois)")
-    st.write("Usuários carregados da planilha:")
-    st.dataframe(usuarios_df)
-    st.write("Email digitado:", email_input)
-    st.write("Senha digitada:", senha_input)
-
-    # Normalização para evitar erro de espaços e maiúsculas
-    usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip().str.lower()
-    usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
-
-    email_normalizado = email_input.lower()
-
-    usuario = usuarios_df[
-        (usuarios_df["email"] == email_normalizado) &
-        (usuarios_df["senha"] == senha_input)
+if btn_login:
+    usuario_validado = usuarios_df[
+        (usuarios_df["usuario"] == usuario) &
+        (usuarios_df["senha"] == senha)
     ]
 
-    if st.button("Entrar"):
-        if not usuario.empty:
-            st.session_state["logado"] = True
-            st.session_state["usuario"] = usuario.iloc[0]["email"]
-            st.session_state["representante"] = usuario.iloc[0]["representante"]
-            st.rerun()
-        else:
-            st.error("❌ Usuário ou senha incorretos. Confira a planilha `usuarios.xlsx`.")
+    if usuario_validado.empty:
+        st.error("❌ Usuário ou senha incorretos.")
+        st.stop()
 
-    st.stop()  # impede o restante do app de carregar
+    representante = usuario_validado.iloc[0]["representante"]
+    st.session_state["logado"] = True
+    st.session_state["representante"] = representante
+    st.rerun()
 
-# ======================================================
-# ✅ ÁREA LOGADA
-# ======================================================
+if "logado" not in st.session_state:
+    st.stop()
 
-st.sidebar.title(f"👋 Olá, {st.session_state['representante']}")
-paginas = ["Dashboard", "Clientes", "Ranking", "Dossiê Cliente"]
-pagina = st.sidebar.radio("Navegação", paginas)
+# --------------------------
+# PÁGINA PRINCIPAL
+# --------------------------
+representante = st.session_state["representante"]
+st.subheader(f"👤 Bem-vindo, {representante}")
 
-# ---------------------------
-# CARREGAMENTOS
-# ---------------------------
-representante = st.session_state['representante']
+# Filtra vendas do representante
 vendas_rep = vendas_df[vendas_df["representante"] == representante]
 
-# ---------------------------
-# DASHBOARD
-# ---------------------------
-if pagina == "Dashboard":
-    st.title("📊 Dashboard de Vendas")
+colecao = st.selectbox("Selecione a coleção:", sorted(vendas_rep["colecao"].unique()))
+data_filtro = st.date_input("Selecione uma data referência para meta semanal:")
 
-    meta = metas_df[metas_df["representante"] == representante]
+# --------------------------
+# META MENSAL (tabela metas.xlsx)
+# --------------------------
+meta_mensal = metas_df[
+    (metas_df["representante"] == representante) &
+    (metas_df["colecao"] == colecao)
+]
 
-    if not meta.empty:
-        meta_valor = float(meta.iloc[0]["meta_vendas"])
-        meta_clientes = int(meta.iloc[0]["meta_clientes"])
-    else:
-        meta_valor = 0
-        meta_clientes = 0
+if not meta_mensal.empty:
+    meta_mensal_valor = meta_mensal.iloc[0]["meta"]
+else:
+    meta_mensal_valor = 0
 
-    total_vendido = vendas_rep["valor_vendido"].sum()
-    porcentagem_meta = (total_vendido / meta_valor) * 100 if meta_valor > 0 else 0
+# Soma das vendas do representante na coleção
+total_vendido = vendas_rep[vendas_rep["colecao"] == colecao]["valor"].sum()
 
-    # Barra de progresso
-    st.subheader(f"🏁 Você atingiu **{porcentagem_meta:.1f}%** da meta da coleção")
-    st.progress(min(porcentagem_meta / 100, 1.0))
+# --------------------------
+# META SEMANAL (geral por coleção)
+# --------------------------
+meta_semana = metas_semanais_df[
+    (metas_semanais_df["colecao"] == colecao) &
+    (metas_semanais_df["semana_inicio"] <= pd.to_datetime(data_filtro)) &
+    (metas_semanais_df["semana_fim"] >= pd.to_datetime(data_filtro))
+]
 
-    # Cálculo semanal
-    hoje = datetime.date.today()
-    semana_atual = metas_semanais_df[
-        (metas_semanais_df["representante"] == representante)
-        & (pd.to_datetime(metas_semanais_df["semana_inicio"]).dt.date <= hoje)
-        & (pd.to_datetime(metas_semanais_df["semana_fim"]).dt.date >= hoje)
-    ]
+if not meta_semana.empty:
+    percentual_semana = meta_semana.iloc[0]["percentual_da_meta"]
+    meta_semana_valor = (meta_mensal_valor * percentual_semana)
+else:
+    percentual_semana = 0
+    meta_semana_valor = 0
 
-    if not semana_atual.empty:
-        semana_meta_valor = semana_atual.iloc[0]["meta_semanal"]
-        ticket_medio_planejado = meta_valor / meta_clientes if meta_clientes > 0 else 0
-        clientes_necessarios = semana_meta_valor / ticket_medio_planejado if ticket_medio_planejado > 0 else 0
+# --------------------------
+# EXIBIÇÃO DAS INFORMAÇÕES
+# --------------------------
+col1, col2, col3 = st.columns(3)
+col1.metric("Meta Mensal", f"R$ {meta_mensal_valor:,.2f}".replace(",", "."))
+col2.metric("Meta da Semana", f"R$ {meta_semana_valor:,.2f}".replace(",", "."))
+col3.metric("Vendido", f"R$ {total_vendido:,.2f}".replace(",", "."))
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Meta de vendas da semana", f"R$ {semana_meta_valor:,.2f}")
-        col2.metric("Ticket médio previsto", f"R$ {ticket_medio_planejado:,.2f}")
-        col3.metric("Clientes necessários na semana", f"{clientes_necessarios:.1f}")
-    else:
-        st.warning("Nenhuma meta semanal configurada para esta data.")
-
-# ---------------------------
-# CLIENTES
-# ---------------------------
-elif pagina == "Clientes":
-    st.title("👥 Clientes")
-    st.dataframe(vendas_rep[["cliente", "cidade", "valor_vendido"]].sort_values("cliente"))
-
-# ---------------------------
-# RANKING DE VENDAS
-# ---------------------------
-elif pagina == "Ranking":
-    st.title("🏆 Ranking de Clientes")
-
-    ranking = vendas_rep.groupby("cliente")["valor_vendido"].sum().reset_index()
-    ranking = ranking.sort_values("valor_vendido", ascending=False)
-    st.dataframe(ranking)
-
-# ---------------------------
-# DOSSIÊ CLIENTE
-# ---------------------------
-elif pagina == "Dossiê Cliente":
-    st.title("📂 Dossiê do Cliente")
-    cliente_sel = st.selectbox("Selecione o cliente", vendas_rep["cliente"].unique())
-    st.dataframe(vendas_rep[vendas_rep["cliente"] == cliente_sel])
-
-
+st.write("📊 **Detalhamento das vendas**")
+st.dataframe(vendas_rep[vendas_rep["colecao"] == colecao])
