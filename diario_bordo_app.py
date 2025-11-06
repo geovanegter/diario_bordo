@@ -1,169 +1,252 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from streamlit_js_eval import streamlit_js_eval
-import requests
 
+# ================================
+# CONFIGURAÇÕES DO APP
+# ================================
 st.set_page_config(
-    page_title="Diário de Bordo",
+    page_title="Diário de Bordo Comercial",
     layout="wide",
+    page_icon="📘"
 )
 
-# ------------------------------------------------------------
-# TEMA GLOBAL (CSS)
-# ------------------------------------------------------------
+# ================================
+# ESTILO (CSS)
+# ================================
 st.markdown("""
 <style>
-body {
+
+html, body, [class*="css"]  {
     font-family: 'Inter', sans-serif;
 }
-header, .css-18e3th9, .css-1d391kg { visibility: hidden; } /* remove header padrão */
-.block-container {
-    padding-top: 1rem;
+
+/* Header */
+.header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 30px;
+    background: white;
+    border-bottom: 1px solid #E7E7E7;
+    margin-bottom: 25px;
 }
-button[kind="primary"] {
-    border-radius: 8px;
+.avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: #d1d1d1;
+}
+.username {
+    font-size: 20px;
+    font-weight: 600;
+}
+.city {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Botões de navegação */
+.nav-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 25px;
+}
+.nav-btn {
     padding: 10px 18px;
+    border-radius: 8px;
+    background: #F7F7F7;
+    border: 1px solid #DDD;
+    cursor: pointer;
     transition: 0.2s;
 }
-button[kind="primary"]:hover {
-    opacity: 0.7;
+.nav-btn:hover {
+    background: #ececec;
 }
-.card {
-    background: #ffffff;
-    padding: 22px 26px;
-    border-radius: 14px;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.06);
-    border: 1px solid #eaeaea;
+.nav-btn-selected {
+    background: #0066ff !important;
+    color: white !important;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------------------------------------------------
-# FUNÇÃO: pegar localização via JS + API Nominatim
-# ------------------------------------------------------------
-def obter_localizacao():
-    coords = streamlit_js_eval(js_expressions="await new Promise(resolve => navigator.geolocation.getCurrentPosition(pos => resolve([pos.coords.latitude, pos.coords.longitude])));")
-    if not coords:
-        return None
-
-    lat, lon = coords
-    url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
-    try:
-        r = requests.get(url, headers={"User-Agent": "diario-bordo"})
-        dados = r.json()
-        cidade = dados.get("address", {}).get("city") or dados.get("address", {}).get("town")
-        estado = dados.get("address", {}).get("state")
-        return f"{cidade} / {estado}"
-    except:
-        return None
+# ================================
+# FUNÇÃO PARA CARREGAR PLANILHAS
+# ================================
+@st.cache_data
+def carregar_planilhas():
+    return {
+        "usuarios": pd.read_excel("dados/usuarios.xlsx"),
+        "vendas": pd.read_excel("dados/vendas.xlsx"),
+        "metas": pd.read_excel("dados/metas_colecao.xlsx")
+    }
 
 
-# ------------------------------------------------------------
+dfs = carregar_planilhas()
+
+# ================================
+# AUTENTICAÇÃO
+# ================================
+def autenticar(email, senha):
+    usuarios = dfs["usuarios"]
+
+    # Garantir comparação evitando erro com tipos
+    usuarios["email"] = usuarios["email"].astype(str)
+    usuarios["senha"] = usuarios["senha"].astype(str)
+
+    user = usuarios[
+        (usuarios["email"].str.lower() == email.lower()) &
+        (usuarios["senha"] == senha)
+    ]
+
+    if len(user) == 1:
+        return user.iloc[0].to_dict()
+
+    return None
+
+
+# ================================
 # LOGIN
-# ------------------------------------------------------------
-usuarios_df = pd.read_excel("dados/usuarios.xlsx")  # colunas: email, senha, representante
-
+# ================================
 if "logado" not in st.session_state:
     st.session_state.logado = False
+    st.session_state.user = None
+    st.session_state.pagina = "Dashboard"
 
 if not st.session_state.logado:
+    st.title("🔐 Acesso ao Diário de Bordo")
 
-    st.markdown("<h2 style='text-align:center;'>🔐 Diário de Bordo</h2>", unsafe_allow_html=True)
+    with st.form("login_form"):
+        email = st.text_input("E-mail")
+        senha = st.text_input("Senha", type="password")
+        enviar = st.form_submit_button("Entrar")
 
-    usuario = st.text_input("Usuário")
-    senha = st.text_input("Senha", type="password")
+        if enviar:
+            user = autenticar(email, senha)
 
-    if st.button("Entrar"):
-        usuario = usuario.strip()
-        senha = senha.strip()
-
-        user_row = usuarios_df[
-            (usuarios_df["representante"] == usuario) &
-            (usuarios_df["senha"] == senha)
-        ]
-
-        if not user_row.empty:
-            st.session_state.logado = True
-            st.session_state.usuario = usuario
-            st.session_state.nome = user_row["nome"].values[0]
-            st.session_state.localizacao = None
-            st.experimental_rerun()
-        else:
-            st.error("Usuário ou senha inválidos.")
-    st.stop()
+            if user:
+                st.session_state.logado = True
+                st.session_state.user = user
+                st.rerun()
+            else:
+                st.error("❌ Email ou senha inválidos!")
+                st.stop()
 
 
-# ------------------------------------------------------------
-# APÓS LOGIN — CARREGAR PLANILHAS
-# ------------------------------------------------------------
-vendas_df = pd.read_excel("dados/vendas.xlsx")
-metas_df = pd.read_excel("dados/metas.xlsx")
+# ==================================
+# TELA PRINCIPAL
+# ==================================
+user = st.session_state.user
+representante = user["representante"]
 
-usuario_nome = st.session_state.nome
+# === pegar localização com JS ===
+coords = streamlit_js_eval(
+    js_expression="navigator.geolocation.getCurrentPosition((pos)=>pos.coords.latitude + ',' + pos.coords.longitude);",
+    key="getLocation"
+)
 
-# Pegar localização (executa só na primeira vez)
-if st.session_state.localizacao is None:
-    st.session_state.localizacao = obter_localizacao()
+cidade = "Localização não encontrada"
+if coords:
+    cidade = "📍 Usuário conectado"
 
 
-# ------------------------------------------------------------
-# HEADER CARD A (VISUAL)
-# ------------------------------------------------------------
+# HEADER
 st.markdown(f"""
-<div class="card">
-    <h2 style="margin-bottom:8px;">👋 Bem-vindo, {usuario_nome}!</h2>
-    <p style="font-size: 16px; color: #666;">
-        Você está em: <strong>{st.session_state.localizacao or "Obtendo localização..."}</strong>
-    </p>
+<div class="header">
+    <img src="https://ui-avatars.com/api/?name={representante}&background=random" class="avatar" />
+    <div>
+        <div class="username">{representante}</div>
+        <div class="city">{cidade}</div>
+    </div>
 </div>
-<br>
 """, unsafe_allow_html=True)
 
 
-# ------------------------------------------------------------
-# FILTRA VENDAS DO REPRESENTANTE
-# ------------------------------------------------------------
-vendas_rep = vendas_df[vendas_df["representante"].str.lower() == usuario_nome.lower()]
+# ================================
+# Navegação com botões
+# ================================
+paginas = ["Dashboard", "Registrar Visita", "Metas"]
 
-total_vendido = vendas_rep["valor_vendido"].sum()
+col1, col2, col3 = st.columns([1, 1, 1])
+botoes = [col1, col2, col3]
 
-meta_row = metas_df[metas_df["representante"].str.lower() == usuario_nome.lower()]
+for i, pagina in enumerate(paginas):
+    if botoes[i].button(
+        pagina,
+        key=pagina,
+    ):
+        st.session_state.pagina = pagina
+        st.rerun()
 
-meta_vendas = meta_row["meta_vendas"].sum() if "meta_vendas" in meta_row else 0
-meta_clientes = meta_row["meta_clientes"].sum() if "meta_clientes" in meta_row else 0
+# Marcar botão selecionado
+st.markdown("""
+<script>
+const selected = document.querySelector(`button[kind="primary"].st-emotion-cache-1wivap2`);
+</script>
+""", unsafe_allow_html=True)
 
-falta_vender = max(meta_vendas - total_vendido, 0)
-clientes_atendidos = vendas_rep["cliente"].nunique()
-faltam_clientes = max(meta_clientes - clientes_atendidos, 0)
+
+# ================================
+# CONTEÚDO DAS PÁGINAS
+# ================================
+pagina = st.session_state.pagina
 
 
-# ------------------------------------------------------------
-# LAYOUT PRINCIPAL
-# ------------------------------------------------------------
-col1, col2, col3 = st.columns(3)
+# ---------------- DASHBOARD ----------------
+if pagina == "Dashboard":
 
-with col1:
-    st.metric("Meta do mês (R$)", f"R$ {meta_vendas:,.2f}")
+    vendas = dfs["vendas"]
+    vendas_rep = vendas[vendas["representante"] == representante]
 
-with col2:
+    total_vendido = vendas_rep["valor_vendido"].sum()
+
+    metas = dfs["metas"]
+    meta_do_rep = metas[metas["representante"] == representante]["meta_vendas"].sum()
+
+    falta_vender = max(meta_do_rep - total_vendido, 0)
+
+    st.subheader("📊 Progresso da Meta")
     st.metric("Total vendido", f"R$ {total_vendido:,.2f}")
-
-with col3:
-    st.metric("Falta vender", f"R$ {falta_vender:,.2f}")
-
-st.divider()
-
-col4, col5 = st.columns(2)
-
-with col4:
-    st.metric("Clientes atendidos", clientes_atendidos)
-
-with col5:
-    st.metric("Faltam atender", faltam_clientes)
+    st.metric("Meta restante", f"R$ {falta_vender:,.2f}")
 
 
-# Tabela de vendas
-st.subheader("📄 Últimas vendas")
-st.dataframe(vendas_rep, use_container_width=True)
+# ---------------- REGISTRAR VISITA ----------------
+elif pagina == "Registrar Visita":
+
+    vendas = dfs["vendas"]
+
+    st.subheader("📝 Novo Registro de Visita")
+
+    cliente = st.text_input("Cliente")
+    colecao = st.text_input("Coleção")
+    valor = st.number_input("Valor vendido (R$)", step=100.0)
+
+    if st.button("Salvar registro"):
+        novo = pd.DataFrame([{
+            "data": datetime.now(),
+            "representante": representante,
+            "cliente": cliente,
+            "colecao": colecao,
+            "valor_vendido": valor,
+        }])
+
+        dfs["vendas"] = pd.concat([dfs["vendas"], novo], ignore_index=True)
+        dfs["vendas"].to_excel("dados/vendas.xlsx", index=False)
+
+        st.success("✅ Visita registrada com sucesso!")
 
 
+# ---------------- METAS ----------------
+elif pagina == "Metas":
+
+    metas = dfs["metas"]
+    metas_rep = metas[metas["representante"] == representante]
+
+    st.subheader("🏆 Metas do representante")
+    st.dataframe(metas_rep)
+
+
+# BOTÃO DE LOGOUT
+st.sidebar.button("Logout", on_click=lambda: [st.session_state.clear(), st.rerun()])
