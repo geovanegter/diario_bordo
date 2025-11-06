@@ -52,7 +52,7 @@ def carregar_planilhas():
     usuarios = pd.read_excel("dados/usuarios.xlsx")
     vendas = pd.read_excel("dados/vendas.xlsx")
     metas_colecao = pd.read_excel("dados/metas_colecao.xlsx")
-    metas_semana = pd.read_excel("dados/metas_semana.xlsx")
+    metas_semana = pd.read_excel("dados/meta_semanal.xlsx")
     return usuarios, vendas, metas_colecao, metas_semana
 
 
@@ -195,6 +195,7 @@ elif st.session_state.pagina == "Dossiê do Cliente":
     if cliente:
         historico = vendas_rep[vendas_rep["cliente"] == cliente]
         st.dataframe(historico)
+
 
 
 
