@@ -34,8 +34,27 @@ if "autenticado" not in st.session_state:
 if not st.session_state.autenticado:
     st.title("🔐 Login")
 
-    email = st.text_input("Usuário (e-mail)")
-    senha = st.text_input("Senha", type="password")
+email_input = st.text_input("Email").strip()
+senha_input = st.text_input("Senha", type="password").strip()
+
+# ✅ Debug temporário
+st.write("🔍 DEBUG - usuários carregados:")
+st.dataframe(usuarios_df)
+
+st.write("🔍 DEBUG - email digitado:", email_input)
+st.write("🔍 DEBUG - senha digitada:", senha_input)
+
+# Normalização para evitar erro de espaços e caixa alta
+usuarios_df["email"] = usuarios_df["email"].astype(str).str.strip().str.lower()
+usuarios_df["senha"] = usuarios_df["senha"].astype(str).str.strip()
+
+email_normalizado = email_input.lower()
+
+usuario = usuarios_df[
+    (usuarios_df["email"] == email_normalizado) &
+    (usuarios_df["senha"] == senha_input)
+]
+
     botao = st.button("Entrar")
 
     if botao:
@@ -109,6 +128,7 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
