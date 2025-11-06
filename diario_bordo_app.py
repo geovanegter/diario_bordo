@@ -26,8 +26,6 @@ def carregar_dados():
         return None, None, None
 
     return usuarios, metas_colecao, metas_semana
-    
-st.write("Usuários carregados:", usuarios)
 
 # ==================== LOGIN ====================
 if "autenticado" not in st.session_state:
@@ -111,6 +109,7 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
