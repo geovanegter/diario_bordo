@@ -72,7 +72,7 @@ if not st.session_state.logado:
 # USUÁRIO LOGADO
 # -------------------------------
 user = st.session_state.user
-representante = user.get("nome", None)
+representante = user.get("representante", None)
 if representante is None:
     st.error("❌ Usuário sem nome definido na planilha!")
     st.stop()
@@ -141,6 +141,7 @@ if not week_row.empty:
         clientes_restantes = max((percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == row['colecao'], 'meta_vendas'].values[0]) / ticket_medio - vendas_semana / ticket_medio,0)
         st.markdown(f"Vendas semanais realizadas: R$ {vendas_semana:,.2f}")
         st.markdown(f"Clientes a atender nesta semana: {clientes_restantes:.0f}")
+
 
 
 
