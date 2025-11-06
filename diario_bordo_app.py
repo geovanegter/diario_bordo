@@ -288,7 +288,7 @@ if pagina == "Dashboard":
     total_vendido = get_numeric_series(vendas_rep, "valor_vendido").sum() if not vendas_rep.empty else 0.0
     clientes_unicos = vendas_rep["cliente"].nunique() if "cliente" in vendas_rep.columns else 0
 
-    # detect meta_vendas column in metas
+    # detect meta_vendas
     meta_vendas_col = None
     for c in metas.columns:
         if "meta" in c.lower() and "vendas" in c.lower():
@@ -307,7 +307,7 @@ if pagina == "Dashboard":
         except:
             meta_vendas = 0.0
 
-    # meta clients
+    # meta clientes
     meta_clientes_col = None
     for c in metas.columns:
         if "cliente" in c.lower() and "meta" in c.lower():
@@ -332,22 +332,34 @@ if pagina == "Dashboard":
     falta_clientes = max(meta_clientes - clientes_unicos, 0)
     clientes_por_dia = falta_clientes / days_remaining if days_remaining > 0 else falta_clientes
 
+    # ✅ percentual da meta
+    if meta_vendas > 0:
+        percent = min(total_vendido / meta_vendas, 1.0)
+        st.write(f"Progresso da meta de vendas: **{percent*100:.1f}%**")
+        st.progress(percent)
+    else:
+        st.info("Meta de vendas não definida para este representante.")
+
+    st.write(" ")
+
+    # ✅ CARDS COM EMOJIS
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f"<div class='card'><h4>Total vendido</h4><h2>R$ {total_vendido:,.2f}</h2></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='card'><h4>Meta vendas</h4><h2>R$ {meta_vendas:,.2f}</h2></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='card'><h4>Falta vender (R$/dia)</h4><h2>R$ {venda_por_dia:,.2f}</h2></div>", unsafe_allow_html=True)
-    c4.markdown(f"<div class='card'><h4>Clientes / dia</h4><h2>{clientes_por_dia:.1f}</h2></div>", unsafe_allow_html=True)
+
+    c1.markdown(f"<div class='card'><h4>💰 Total vendido</h4><h2>R$ {total_vendido:,.2f}</h2></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='card'><h4>🎯 Meta vendas</h4><h2>R$ {meta_vendas:,.2f}</h2></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='card'><h4>🔥 Falta vender (R$/dia)</h4><h2>R$ {venda_por_dia:,.2f}</h2></div>", unsafe_allow_html=True)
+    c4.markdown(f"<div class='card'><h4>👥 Clientes / dia</h4><h2>{clientes_por_dia:.1f}</h2></div>", unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.write(" ")
     st.subheader("Últimos registros (exibição simplificada)")
     if not vendas_rep.empty:
-        # display last N by insertion order (no date column)
         last_n = vendas_rep.tail(10).iloc[::-1]
         st.dataframe(last_n.reset_index(drop=True), use_container_width=True)
     else:
         st.info("Nenhuma venda encontrada para esse representante.")
+
 
 # PAGE: Clientes
 elif pagina == "Clientes":
@@ -409,3 +421,4 @@ elif pagina == "Dossiê Cliente" or pagina == "Dossiê Cliente":
 
 else:
     st.info("Página não encontrada. Selecione uma opção no menu lateral.")
+
