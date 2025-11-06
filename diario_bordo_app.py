@@ -165,8 +165,3 @@ with col5:
 # Tabela de vendas
 st.subheader("📄 Últimas vendas")
 st.dataframe(vendas_rep, use_container_width=True)
-
-# Tabela de vendas
-st.subheader("📄 Últimas vendas")
-st.dataframe(vendas_rep, use_container_width=True)
-
