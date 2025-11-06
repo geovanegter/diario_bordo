@@ -1,13 +1,15 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
+# -------------------------------
+# Configuração da página
+# -------------------------------
 st.set_page_config(page_title="📘 Diário de Bordo Comercial", layout="wide")
 
 # -------------------------------
 # Funções
 # -------------------------------
-
 @st.cache_data
 def carregar_planilhas():
     return {
@@ -21,13 +23,13 @@ def autenticar(email, senha):
     usuarios = dfs["usuarios"]
     usuarios["email"] = usuarios["email"].astype(str)
     usuarios["senha"] = usuarios["senha"].astype(str)
-    
+
     user = usuarios[
         (usuarios["email"].str.lower() == email.lower()) &
         (usuarios["senha"] == senha)
     ]
 
-    if len(user) == 1:
+    if not user.empty:
         return user.iloc[0].to_dict()
     return None
 
@@ -41,7 +43,7 @@ def calcular_ticket_medio(rep):
     return total_venda / total_clientes if total_clientes > 0 else 0
 
 # -------------------------------
-# Carrega planilhas
+# Carrega dados
 # -------------------------------
 dfs = carregar_planilhas()
 
@@ -69,12 +71,12 @@ if not st.session_state.logado:
                 st.stop()
 
 # -------------------------------
-# USUÁRIO LOGADO
+# REPRESENTANTE LOGADO
 # -------------------------------
 user = st.session_state.user
 representante = user.get("representante", None)
 if representante is None:
-    st.error("❌ Usuário sem nome definido na planilha!")
+    st.error("❌ Usuário sem representante definido!")
     st.stop()
 
 # -------------------------------
@@ -93,7 +95,7 @@ if st.sidebar.button("Logout"):
 # -------------------------------
 # DASHBOARD PRINCIPAL
 # -------------------------------
-st.markdown(f"## 👋 Olá, {user['nome']}")
+st.markdown(f"## 👋 Olá, {representante}")
 st.markdown(f"Você está em: 📍 Localização atual (em breve com geolocalização)")
 
 vendas = dfs["vendas"]
@@ -103,7 +105,7 @@ meta_semanal = dfs["meta_semanal"]
 # Filtra vendas do representante
 vendas_rep = vendas[vendas["representante"] == representante]
 
-# Calcula progresso de cada coleção
+# Progresso das metas por coleção
 st.subheader("🎯 Progresso das metas por coleção")
 for _, row in metas_colecao[metas_colecao["representante"] == representante].iterrows():
     colecao = row["colecao"]
@@ -113,39 +115,28 @@ for _, row in metas_colecao[metas_colecao["representante"] == representante].ite
     st.markdown(f"**Coleção {colecao}** — Você atingiu {progresso*100:.1f}% da meta")
     st.progress(progresso)
 
-# -------------------------------
 # Metas semanais
-# -------------------------------
 st.subheader("📅 Meta da semana")
-hoje = datetime.today().date()
-week_row = meta_semanal[meta_semanal["colecao"].isin(
+week_rows = meta_semanal[meta_semanal["colecao"].isin(
     metas_colecao[metas_colecao["representante"] == representante]["colecao"]
 )]
-if not week_row.empty:
-    for _, row in week_row.iterrows():
+if not week_rows.empty:
+    for _, row in week_rows.iterrows():
+        colecao = row["colecao"]
         semana_inicio = pd.to_datetime(row["semana_inicio"]).date()
         semana_fim = pd.to_datetime(row["semana_fim"]).date()
         percentual_meta = row["percentual_da_meta"]
 
-        # Calcula vendas na semana
+        # Vendas na semana
         vendas_semana = vendas_rep[
-            (pd.to_datetime(vendas_rep["data"]) >= semana_inicio) &
-            (pd.to_datetime(vendas_rep["data"]) <= semana_fim)
+            (pd.to_datetime(vendas_rep.get("data", pd.Series(datetime.today()))) >= semana_inicio) &
+            (pd.to_datetime(vendas_rep.get("data", pd.Series(datetime.today()))) <= semana_fim)
         ]["valor_vendido"].sum()
 
-        st.markdown(f"**Coleção {row['colecao']}** — {percentual_meta}% da meta da semana")
-        st.progress(min(vendas_semana / (percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == row['colecao'], 'meta_vendas'].values[0]),1.0))
+        st.markdown(f"**Coleção {colecao}** — {percentual_meta}% da meta da semana")
+        st.progress(min(vendas_semana / (percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == colecao, 'meta_vendas'].values[0]),1.0))
 
-        # Clientes a atender
         ticket_medio = calcular_ticket_medio(representante)
-        clientes_restantes = max((percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == row['colecao'], 'meta_vendas'].values[0]) / ticket_medio - vendas_semana / ticket_medio,0)
+        clientes_restantes = max((percentual_meta / 100 * metas_colecao.loc[metas_colecao['colecao'] == colecao, 'meta_vendas'].values[0]) / ticket_medio - vendas_semana / ticket_medio,0)
         st.markdown(f"Vendas semanais realizadas: R$ {vendas_semana:,.2f}")
         st.markdown(f"Clientes a atender nesta semana: {clientes_restantes:.0f}")
-
-
-
-
-
-
-
-
