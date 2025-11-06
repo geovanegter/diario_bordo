@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 
+st.write("Usuários carregados:", usuarios_df)
+
 # ==================== CONFIGURAÇÕES GERAIS ====================
 st.set_page_config(page_title="Diário de Bordo", layout="wide")
 
@@ -110,3 +112,4 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
