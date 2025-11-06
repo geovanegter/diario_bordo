@@ -179,7 +179,7 @@ if not st.session_state.logado:
                 st.session_state.coords = coords
                 loc = reverse_geocode(coords[0], coords[1])
                 st.session_state.local_text = loc
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("E-mail ou senha inválidos.")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -445,6 +445,7 @@ elif pagina == "Dossiê Cliente":
 
 else:
     st.info("Selecione uma página no menu lateral.")
+
 
 
 
